@@ -363,7 +363,7 @@ let selectedArchiveImg  = null;
 let archivePickerImages = [];
 let selectedArchiveFolder = '__all__';
 let selectedArchiveManageFolder = '__all__';
-let currentArchiveType = 'image';
+let currentArchiveType = 'all';
 let archiveSearchText = '';
 
 function normalizeFolderName(name) {
@@ -622,12 +622,7 @@ document.getElementById('refreshScheduleBtn').addEventListener('click', loadSche
 let archiveImages = [];
 
 function renderArchiveTypeButtons() {
-    document.querySelectorAll('.archive-type-btn').forEach(btn => {
-        const active = btn.dataset.type === currentArchiveType;
-        btn.className = active
-            ? 'archive-type-btn px-3 py-2 text-sm rounded-xl bg-indigo-600 text-white'
-            : 'archive-type-btn px-3 py-2 text-sm rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200';
-    });
+    // Tek arşiv ekranı kullanılıyor.
 }
 
 function renderArchiveFolderPanel(rows) {
@@ -661,8 +656,8 @@ function loadArchive() {
     const searchParam = archiveSearchText ? `&q=${encodeURIComponent(archiveSearchText)}` : '';
 
     Promise.all([
-        fetch(`/api/archive?type=${encodeURIComponent(currentArchiveType)}${folderParam}${searchParam}`).then(r => r.json()),
-        fetch(`/api/archive/folders?type=${encodeURIComponent(currentArchiveType)}`).then(r => r.json())
+        fetch(`/api/archive?${[folderParam.replace('&',''), searchParam.replace('&','')].filter(Boolean).join('&')}`).then(r => r.json()),
+        fetch('/api/archive/folders').then(r => r.json())
     ]).then(([items, folders]) => {
         archiveImages = items;
         renderArchiveTypeButtons();
@@ -678,7 +673,7 @@ function renderArchiveGrid(images) {
     const grid = document.getElementById('archiveGrid');
     if (!images.length) {
         grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <span class="material-symbols-rounded">photo_library</span>Bu klasörde görsel yok</div>`;
+            <span class="material-symbols-rounded">folder_open</span>Bu klasörde dosya yok</div>`;
         return;
     }
 
@@ -687,15 +682,26 @@ function renderArchiveGrid(images) {
         const preview = mediaType === 'image'
             ? `<img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">`
             : mediaType === 'video'
-                ? `<video src="${escHtml(img.path)}" class="w-full h-full object-cover" muted preload="metadata"></video>`
-                : `<div class="w-full h-full flex items-center justify-center bg-slate-100"><span class="material-symbols-rounded text-4xl text-slate-500">graphic_eq</span></div>`;
+                ? `<video src="${escHtml(img.path)}" preload="metadata" muted></video>`
+                : `<span class="material-symbols-rounded text-slate-500">graphic_eq</span>`;
         const icon = mediaType === 'image' ? 'image' : mediaType === 'video' ? 'movie' : 'mic';
+        const typeText = mediaType === 'image' ? 'Görsel' : mediaType === 'video' ? 'Video' : 'Ses';
+        const modified = new Date(img.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+
         return `
-        <div class="archive-item" data-id="${img.id}">
-            ${preview}
-            <div class="archive-name"><span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">${icon}</span> ${escHtml(normalizeFolderName(img.folder))} / ${escHtml(img.name)}</div>
-            <button class="archive-del" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
-                <span class="material-symbols-rounded">close</span>
+        <div class="archive-row" data-id="${img.id}">
+            <div class="archive-name-cell">
+                <div class="archive-thumb">${preview}</div>
+                <div class="archive-name-main">
+                    <div class="title">${escHtml(img.name)}</div>
+                    <div class="sub"><span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">${icon}</span> ${typeText} • ${escHtml(normalizeFolderName(img.folder))}</div>
+                </div>
+            </div>
+            <div class="muted owner-col">ben</div>
+            <div class="muted">${modified}</div>
+            <div class="muted">—</div>
+            <button class="archive-delete-btn" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
+              <span class="material-symbols-rounded" style="font-size:18px">delete</span>
             </button>
         </div>`;
     }).join('');
@@ -703,9 +709,9 @@ function renderArchiveGrid(images) {
 
 window.deleteArchiveImg = async (id, e) => {
     e.stopPropagation();
-    if (!confirm('Bu resmi arşivden silmek istiyor musunuz?')) return;
+    if (!confirm('Bu dosyayı arşivden silmek istiyor musunuz?')) return;
     const res = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
-    if (res.ok) { loadArchive(); showSnack('Resim arşivden silindi.'); }
+    if (res.ok) { loadArchive(); showSnack('Dosya arşivden silindi.'); }
     else showSnack('Silinemedi.', true);
 };
 
@@ -715,19 +721,10 @@ const archiveFolderInput = document.getElementById('archiveFolderInput');
 const archiveNameInput = document.getElementById('archiveNameInput');
 
 function syncArchiveFileAccept() {
-    if (currentArchiveType === 'image') archiveFileInput.accept = 'image/*';
-    else if (currentArchiveType === 'video') archiveFileInput.accept = 'video/*';
-    else archiveFileInput.accept = 'audio/*';
+    archiveFileInput.accept = 'image/*,video/*,audio/*';
 }
 
-document.querySelectorAll('.archive-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        currentArchiveType = btn.dataset.type;
-        selectedArchiveManageFolder = '__all__';
-        syncArchiveFileAccept();
-        loadArchive();
-    });
-});
+document.querySelectorAll('.archive-type-btn').forEach(() => {});
 
 document.getElementById('archiveSearchInput')?.addEventListener('input', (e) => {
     archiveSearchText = e.target.value.trim();
@@ -741,7 +738,7 @@ document.getElementById('archiveCreateFolderBtn')?.addEventListener('click', asy
         const res = await fetch('/api/archive/folders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: value, mediaType: currentArchiveType })
+            body: JSON.stringify({ name: value, mediaType: 'all' })
         });
         const data = await res.json();
         if (!res.ok) { showSnack(data.error || 'Klasör oluşturulamadı.', true); return; }
@@ -762,10 +759,6 @@ archiveFileInput.addEventListener('change', async () => {
     if (!file) return;
     const customName = archiveNameInput.value.trim();
     if (!customName) { showSnack('Yükleme için dosya adı zorunlu.', true); archiveFileInput.value = ''; return; }
-
-    if (currentArchiveType === 'image' && !file.type.startsWith('image/')) { showSnack('Görsel arşivi için görsel seçin.', true); archiveFileInput.value = ''; return; }
-    if (currentArchiveType === 'video' && !file.type.startsWith('video/')) { showSnack('Video arşivi için video seçin.', true); archiveFileInput.value = ''; return; }
-    if (currentArchiveType === 'audio' && !file.type.startsWith('audio/')) { showSnack('Ses arşivi için ses dosyası seçin.', true); archiveFileInput.value = ''; return; }
 
     const fd = new FormData();
     fd.append('file', file);

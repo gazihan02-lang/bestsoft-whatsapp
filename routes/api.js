@@ -197,9 +197,9 @@ module.exports = function (io) {
     // ── Arşiv klasörü oluştur ────────────────────────────────────
     router.post('/archive/folders', (req, res) => {
         const name = String(req.body.name || '').trim().substring(0, 60);
-        const mediaType = String(req.body.mediaType || '').trim();
+        const mediaType = String(req.body.mediaType || 'all').trim() || 'all';
         if (!name) return res.status(400).json({ error: 'Klasör adı zorunlu.' });
-        if (!['image', 'video', 'audio'].includes(mediaType)) return res.status(400).json({ error: 'Geçersiz arşiv türü.' });
+        if (!['image', 'video', 'audio', 'all'].includes(mediaType)) return res.status(400).json({ error: 'Geçersiz arşiv türü.' });
 
         db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(name, mediaType);
         res.json({ success: true });
