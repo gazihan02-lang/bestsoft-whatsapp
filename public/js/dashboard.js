@@ -645,9 +645,6 @@ function renderArchiveFolderPanel(rows) {
         });
     });
 
-    const manageInput = document.getElementById('archiveFolderInput');
-    if (manageInput && (!manageInput.value || manageInput.value === '__all__')) manageInput.value = 'Genel';
-
     document.getElementById('archiveFolderList').innerHTML = folders.map(f => `<option value="${escHtml(f)}"></option>`).join('');
 }
 
@@ -717,8 +714,6 @@ window.deleteArchiveImg = async (id, e) => {
 
 const archiveUploadBtn  = document.getElementById('archiveUploadBtn');
 const archiveFileInput  = document.getElementById('archiveFileInput');
-const archiveFolderInput = document.getElementById('archiveFolderInput');
-const archiveNameInput = document.getElementById('archiveNameInput');
 const archiveFolderModal = document.getElementById('archiveFolderModal');
 const archiveFolderModalInput = document.getElementById('archiveFolderModalInput');
 
@@ -760,7 +755,6 @@ async function createArchiveFolderFromModal() {
         });
         const data = await res.json();
         if (!res.ok) { showSnack(data.error || 'Klasör oluşturulamadı.', true); return; }
-        archiveFolderInput.value = value;
         selectedArchiveManageFolder = value;
         loadArchive();
         closeArchiveFolderModal();
@@ -787,7 +781,7 @@ archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
 
-    const suggestedName = archiveNameInput.value.trim() || file.name.replace(/\.[^.]+$/, '');
+    const suggestedName = file.name.replace(/\.[^.]+$/, '');
     const enteredName = window.prompt('Dosya adı girin:', suggestedName);
     const customName = String(enteredName || '').trim();
     if (!customName) {
@@ -795,17 +789,16 @@ archiveFileInput.addEventListener('change', async () => {
         archiveFileInput.value = '';
         return;
     }
-    archiveNameInput.value = customName;
 
     const fd = new FormData();
     fd.append('file', file);
     fd.append('name', customName);
-    fd.append('folder', normalizeFolderName(archiveFolderInput.value));
+    fd.append('folder', selectedArchiveManageFolder !== '__all__' ? selectedArchiveManageFolder : 'Genel');
     archiveUploadBtn.disabled = true;
     const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
     archiveUploadBtn.disabled = false;
     archiveFileInput.value = '';
-    if (res.ok) { loadArchive(); archiveNameInput.value = ''; showSnack('Dosya arşive eklendi!'); }
+    if (res.ok) { loadArchive(); showSnack('Dosya arşive eklendi!'); }
     else { const d = await res.json(); showSnack(d.error || 'Yükleme başarısız.', true); }
 });
 
