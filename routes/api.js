@@ -205,6 +205,18 @@ module.exports = function (io) {
         res.json({ success: true });
     });
 
+    // ── Arşiv klasörü sil ───────────────────────────────────────
+    router.delete('/archive/folders', (req, res) => {
+        const name = String(req.query.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Klasör adı gerekli.' });
+        if (name === 'Genel') return res.status(400).json({ error: 'Genel klasörü silinemez.' });
+
+        // Silinen klasördeki dosyaları Genel'e taşı
+        db.prepare("UPDATE image_archive SET folder = 'Genel' WHERE COALESCE(folder, 'Genel') = ?").run(name);
+        db.prepare('DELETE FROM archive_folders WHERE name = ?').run(name);
+        res.json({ success: true });
+    });
+
     // ── Arşive medya yükle ────────────────────────────────────────
     router.post('/archive/upload', uploadArchive.single('file'), (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'Dosya gerekli.' });
@@ -213,13 +225,10 @@ module.exports = function (io) {
             return res.status(400).json({ error: 'Sadece görsel, video veya ses dosyası yüklenebilir.' });
         }
         const rawName = String(req.body.name || '').trim();
-        if (!rawName) {
-            try { fs.unlinkSync(req.file.path); } catch {}
-            return res.status(400).json({ error: 'Arşive eklemek için ad zorunlu.' });
-        }
 
         const folder  = String(req.body.folder || 'Genel').trim().substring(0, 60) || 'Genel';
-        const name    = rawName.substring(0, 100);
+        const fallbackName = String(req.file.originalname || 'Yeni Dosya').replace(/\.[^.]+$/, '');
+        const name    = (rawName || fallbackName).substring(0, 100);
         const webPath = '/media/archive/' + req.file.filename;
         const mediaType = archiveTypeFromMime(req.file.mimetype);
         if (!['image', 'video', 'audio'].includes(mediaType)) {
@@ -230,6 +239,20 @@ module.exports = function (io) {
         const result  = db.prepare('INSERT INTO image_archive (name, path, folder, media_type) VALUES (?, ?, ?, ?)').run(name, webPath, folder, mediaType);
         const newRow  = db.prepare('SELECT * FROM image_archive WHERE id = ?').get(result.lastInsertRowid);
         res.json({ success: true, data: newRow });
+    });
+
+    // ── Arşiv öğesi adını güncelle ─────────────────────────────
+    router.patch('/archive/:id', (req, res) => {
+        const id = parseInt(req.params.id, 10);
+        const name = String(req.body.name || '').trim().substring(0, 100);
+        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
+        if (!name) return res.status(400).json({ error: 'Ad zorunlu.' });
+
+        const row = db.prepare('SELECT id FROM image_archive WHERE id = ?').get(id);
+        if (!row) return res.status(404).json({ error: 'Bulunamadı.' });
+
+        db.prepare('UPDATE image_archive SET name = ? WHERE id = ?').run(name, id);
+        res.json({ success: true });
     });
 
     // ── Arşivden medya sil ────────────────────────────────────────

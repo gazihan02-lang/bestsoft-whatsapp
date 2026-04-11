@@ -631,17 +631,69 @@ function renderArchiveFolderPanel(rows) {
 
     if (!folders.includes(selectedArchiveManageFolder)) selectedArchiveManageFolder = '__all__';
 
-    const allBtn = `<button class="w-full text-left px-3 py-2 rounded-lg text-sm ${selectedArchiveManageFolder === '__all__' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}" data-folder="__all__">Tüm Klasörler</button>`;
-    const folderBtns = folders.map(f => `
-        <button class="w-full text-left px-3 py-2 rounded-lg text-sm ${selectedArchiveManageFolder === f ? 'bg-indigo-100 text-indigo-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}" data-folder="${escHtml(f)}">
-            ${escHtml(f)}
-        </button>`).join('');
+    const allRow = `
+      <div class="archive-folder-row ${selectedArchiveManageFolder === '__all__' ? 'active' : ''}" data-folder="__all__">
+        <button class="archive-folder-btn" data-folder="__all__">
+          <span class="material-symbols-rounded" style="font-size:18px">folder_open</span>
+          <span class="truncate">Tüm Klasörler</span>
+        </button>
+      </div>`;
 
-    panel.innerHTML = allBtn + folderBtns;
+    const folderRows = folders.map(f => {
+        const isActive = selectedArchiveManageFolder === f;
+        const canDelete = f !== 'Genel';
+        return `
+        <div class="archive-folder-row ${isActive ? 'active' : ''}" data-folder="${escHtml(f)}">
+          <button class="archive-folder-btn" data-folder="${escHtml(f)}">
+            <span class="material-symbols-rounded" style="font-size:18px">folder</span>
+            <span class="truncate">${escHtml(f)}</span>
+          </button>
+          ${canDelete ? `<button class="archive-folder-delete" data-delete-folder="${escHtml(f)}" title="Klasörü Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>` : ''}
+        </div>`;
+    }).join('');
+
+    panel.innerHTML = allRow + folderRows;
+
     panel.querySelectorAll('button[data-folder]').forEach(btn => {
         btn.addEventListener('click', () => {
             selectedArchiveManageFolder = btn.dataset.folder;
             loadArchive();
+        });
+    });
+
+    panel.querySelectorAll('button[data-delete-folder]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const folder = btn.dataset.deleteFolder;
+            if (!confirm(`"${folder}" klasörünü silmek istiyor musunuz? Dosyalar Genel klasörüne taşınır.`)) return;
+            try {
+                const res = await fetch(`/api/archive/folders?name=${encodeURIComponent(folder)}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) { showSnack(data.error || 'Klasör silinemedi.', true); return; }
+                if (selectedArchiveManageFolder === folder) selectedArchiveManageFolder = '__all__';
+                loadArchive();
+                showSnack('Klasör silindi.');
+            } catch {
+                showSnack('Klasör silinemedi.', true);
+            }
+        });
+    });
+
+    panel.querySelectorAll('.archive-folder-row').forEach(row => {
+        const folder = row.dataset.folder;
+        row.addEventListener('dragover', (e) => {
+            if (folder === '__all__') return;
+            e.preventDefault();
+            row.classList.add('archive-folder-drop');
+        });
+        row.addEventListener('dragleave', () => row.classList.remove('archive-folder-drop'));
+        row.addEventListener('drop', async (e) => {
+            row.classList.remove('archive-folder-drop');
+            if (folder === '__all__') return;
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (!file) return;
+            await uploadArchiveFile(file, folder);
         });
     });
 
@@ -764,6 +816,43 @@ async function createArchiveFolderFromModal() {
     }
 }
 
+async function uploadArchiveFile(file, folderName) {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', normalizeFolderName(folderName));
+
+    archiveUploadBtn.disabled = true;
+    let createdItem = null;
+    try {
+        const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { showSnack(data.error || 'Yükleme başarısız.', true); return; }
+        createdItem = data.data;
+        loadArchive();
+
+        const suggestedName = String(file.name || 'Yeni Dosya').replace(/\.[^.]+$/, '');
+        const enteredName = window.prompt('Yükleme tamamlandı. Dosya adı girin:', suggestedName);
+        const customName = String(enteredName || '').trim();
+        if (customName && createdItem?.id) {
+            const renameRes = await fetch(`/api/archive/${createdItem.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: customName })
+            });
+            const renameData = await renameRes.json();
+            if (!renameRes.ok) showSnack(renameData.error || 'Dosya adı güncellenemedi.', true);
+            else showSnack('Yüklendi ve dosya adı güncellendi.');
+        } else {
+            showSnack('Dosya yüklendi.');
+        }
+    } catch {
+        showSnack('Yükleme başarısız.', true);
+    } finally {
+        archiveUploadBtn.disabled = false;
+        loadArchive();
+    }
+}
+
 document.getElementById('archiveFolderModalSave')?.addEventListener('click', createArchiveFolderFromModal);
 document.getElementById('archiveFolderModalCancel')?.addEventListener('click', closeArchiveFolderModal);
 document.getElementById('archiveFolderModalClose')?.addEventListener('click', closeArchiveFolderModal);
@@ -781,25 +870,8 @@ archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
 
-    const suggestedName = file.name.replace(/\.[^.]+$/, '');
-    const enteredName = window.prompt('Dosya adı girin:', suggestedName);
-    const customName = String(enteredName || '').trim();
-    if (!customName) {
-        showSnack('Dosya adı girilmedi, yükleme iptal edildi.', true);
-        archiveFileInput.value = '';
-        return;
-    }
-
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('name', customName);
-    fd.append('folder', selectedArchiveManageFolder !== '__all__' ? selectedArchiveManageFolder : 'Genel');
-    archiveUploadBtn.disabled = true;
-    const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
-    archiveUploadBtn.disabled = false;
+    await uploadArchiveFile(file, selectedArchiveManageFolder !== '__all__' ? selectedArchiveManageFolder : 'Genel');
     archiveFileInput.value = '';
-    if (res.ok) { loadArchive(); showSnack('Dosya arşive eklendi!'); }
-    else { const d = await res.json(); showSnack(d.error || 'Yükleme başarısız.', true); }
 });
 
 syncArchiveFileAccept();

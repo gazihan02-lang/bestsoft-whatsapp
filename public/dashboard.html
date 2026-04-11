@@ -64,6 +64,13 @@
     .archive-filter-chip.active { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
     .archive-side-item { width:100%; text-align:left; border-radius:9999px; padding:8px 12px; font-size:.88rem; color:#4b5563; }
     .archive-side-item.active { background:#dbeafe; color:#1d4ed8; font-weight:600; }
+    .archive-folder-row { display:flex; align-items:center; gap:8px; border-radius:12px; padding:6px 8px; }
+    .archive-folder-row.active { background:#dbeafe; }
+    .archive-folder-btn { flex:1; min-width:0; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px; color:#374151; }
+    .archive-folder-row.active .archive-folder-btn { color:#1d4ed8; font-weight:600; }
+    .archive-folder-delete { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:#ef4444; }
+    .archive-folder-delete:hover { background:#fee2e2; }
+    .archive-folder-drop { outline:2px dashed #4f46e5; outline-offset:2px; background:#eef2ff; }
     .archive-row { display:grid; grid-template-columns: minmax(220px, 1.6fr) minmax(120px, .8fr) minmax(130px, .9fr) minmax(80px, .4fr) 46px; gap:12px; align-items:center; padding:10px 12px; border-bottom:1px solid #eef2f7; }
     .archive-row:hover { background:#f8fafc; }
     .archive-row.head { background:#f8fafc; color:#6b7280; font-size:.77rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
@@ -563,7 +570,7 @@
 
             <div class="archive-toolbar-search">
               <span class="material-symbols-rounded text-gray-500" style="font-size:20px">search</span>
-              <input id="archiveSearchInput" type="text" placeholder="Drive'da arayın">
+              <input id="archiveSearchInput" type="text" placeholder="Dosya ara">
               <span class="material-symbols-rounded text-gray-400" style="font-size:20px">tune</span>
             </div>
 
