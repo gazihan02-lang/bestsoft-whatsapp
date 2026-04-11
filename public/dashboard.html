@@ -784,6 +784,15 @@
     <span id="snackbarMsg"></span>
   </div>
 
+  <!-- Lightbox -->
+  <div id="archiveLightbox" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/80" style="cursor:zoom-out">
+    <button id="archiveLightboxClose" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10" style="cursor:pointer">
+      <span class="material-symbols-rounded" style="font-size:22px">close</span>
+    </button>
+    <img id="archiveLightboxImg" src="" alt="" class="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain" style="cursor:default">
+    <video id="archiveLightboxVid" src="" controls class="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl hidden" style="cursor:default"></video>
+  </div>
+
   <div id="archiveFolderModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white shadow-xl border border-gray-200">
       <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">

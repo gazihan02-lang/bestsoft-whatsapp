@@ -738,8 +738,8 @@ function renderArchiveGrid(images) {
         const modified = new Date(img.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 
         return `
-        <div class="archive-row" data-id="${img.id}">
-            <div class="archive-name-cell">
+        <div class="archive-row" data-id="${img.id}" data-path="${escHtml(img.path)}" data-type="${mediaType}">
+            <div class="archive-name-cell" style="cursor:pointer" onclick="openArchiveLightbox(event,this.closest('.archive-row'))">
                 <div class="archive-thumb">${preview}</div>
                 <div class="archive-name-main">
                     <div class="title">${escHtml(img.name)}</div>
@@ -755,6 +755,36 @@ function renderArchiveGrid(images) {
         </div>`;
     }).join('');
 }
+
+window.openArchiveLightbox = function(e, row) {
+    e.stopPropagation();
+    const path = row.dataset.path;
+    const type = row.dataset.type;
+    const lb   = document.getElementById('archiveLightbox');
+    const img  = document.getElementById('archiveLightboxImg');
+    const vid  = document.getElementById('archiveLightboxVid');
+    if (type === 'video') {
+        img.classList.add('hidden'); vid.classList.remove('hidden');
+        vid.src = path; vid.load();
+    } else if (type === 'image') {
+        vid.classList.add('hidden'); img.classList.remove('hidden');
+        img.src = path;
+    } else { return; }
+    lb.classList.remove('hidden'); lb.classList.add('flex');
+};
+
+(function initLightbox() {
+    const lb  = document.getElementById('archiveLightbox');
+    const vid = document.getElementById('archiveLightboxVid');
+    function closeLb() {
+        lb.classList.add('hidden'); lb.classList.remove('flex');
+        vid.pause(); vid.src = '';
+        document.getElementById('archiveLightboxImg').src = '';
+    }
+    document.getElementById('archiveLightboxClose').addEventListener('click', closeLb);
+    lb.addEventListener('click', (e) => { if (e.target === lb) closeLb(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lb.classList.contains('hidden')) closeLb(); });
+})();
 
 window.deleteArchiveImg = async (id, e) => {
     e.stopPropagation();
