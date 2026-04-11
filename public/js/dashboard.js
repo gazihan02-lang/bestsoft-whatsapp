@@ -719,6 +719,20 @@ const archiveUploadBtn  = document.getElementById('archiveUploadBtn');
 const archiveFileInput  = document.getElementById('archiveFileInput');
 const archiveFolderInput = document.getElementById('archiveFolderInput');
 const archiveNameInput = document.getElementById('archiveNameInput');
+const archiveFolderModal = document.getElementById('archiveFolderModal');
+const archiveFolderModalInput = document.getElementById('archiveFolderModalInput');
+
+function openArchiveFolderModal() {
+    archiveFolderModal.classList.remove('hidden');
+    archiveFolderModal.classList.add('flex');
+    archiveFolderModalInput.value = '';
+    archiveFolderModalInput.focus();
+}
+
+function closeArchiveFolderModal() {
+    archiveFolderModal.classList.add('hidden');
+    archiveFolderModal.classList.remove('flex');
+}
 
 function syncArchiveFileAccept() {
     archiveFileInput.accept = 'image/*,video/*,audio/*';
@@ -731,8 +745,12 @@ document.getElementById('archiveSearchInput')?.addEventListener('input', (e) => 
     loadArchive();
 });
 
-document.getElementById('archiveCreateFolderBtn')?.addEventListener('click', async () => {
-    const value = normalizeFolderName(document.getElementById('archiveNewFolder').value);
+document.getElementById('archiveCreateFolderBtn')?.addEventListener('click', () => {
+    openArchiveFolderModal();
+});
+
+async function createArchiveFolderFromModal() {
+    const value = normalizeFolderName(archiveFolderModalInput.value);
     if (!value) return;
     try {
         const res = await fetch('/api/archive/folders', {
@@ -744,12 +762,23 @@ document.getElementById('archiveCreateFolderBtn')?.addEventListener('click', asy
         if (!res.ok) { showSnack(data.error || 'Klasör oluşturulamadı.', true); return; }
         archiveFolderInput.value = value;
         selectedArchiveManageFolder = value;
-        document.getElementById('archiveNewFolder').value = '';
         loadArchive();
+        closeArchiveFolderModal();
         showSnack(`Klasör oluşturuldu: ${value}`);
     } catch {
         showSnack('Klasör oluşturulamadı.', true);
     }
+}
+
+document.getElementById('archiveFolderModalSave')?.addEventListener('click', createArchiveFolderFromModal);
+document.getElementById('archiveFolderModalCancel')?.addEventListener('click', closeArchiveFolderModal);
+document.getElementById('archiveFolderModalClose')?.addEventListener('click', closeArchiveFolderModal);
+archiveFolderModal?.addEventListener('click', (e) => {
+    if (e.target === archiveFolderModal) closeArchiveFolderModal();
+});
+archiveFolderModalInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createArchiveFolderFromModal();
+    if (e.key === 'Escape') closeArchiveFolderModal();
 });
 
 archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
