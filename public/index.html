@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BestApp — Giriş</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'ui-sans-serif', 'sans-serif'],
+                        heading: ['Sora', 'ui-sans-serif', 'sans-serif']
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81'
+                        }
+                    },
+                    animation: {
+                        'fade-up': 'fadeUp .55s cubic-bezier(0.2, 0, 0, 1) both',
+                        'fade-right': 'fadeRight .65s cubic-bezier(0.2, 0, 0, 1) both',
+                        'float-soft': 'floatSoft 14s ease-in-out infinite',
+                        'spin-slow': 'spin .7s linear infinite',
+                        'reveal': 'reveal .7s cubic-bezier(0.2, 0, 0, 1) both'
+                    },
+                    keyframes: {
+                        fadeUp: {
+                            '0%':   { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        fadeRight: {
+                            '0%': { opacity: '0', transform: 'translateX(-24px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' }
+                        },
+                        floatSoft: {
+                            '0%, 100%': { transform: 'translate3d(0, 0, 0)' },
+                            '50%': { transform: 'translate3d(0, -18px, 0)' }
+                        },
+                        reveal: {
+                            '0%': { opacity: '0', clipPath: 'inset(0 0 100% 0)' },
+                            '100%': { opacity: '1', clipPath: 'inset(0 0 0 0)' }
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background:
+                radial-gradient(circle at 12% 18%, #e0e7ff 0%, transparent 36%),
+                radial-gradient(circle at 86% 12%, #cffafe 0%, transparent 28%),
+                radial-gradient(circle at 80% 85%, #e9d5ff 0%, transparent 34%),
+                #f8fafc;
+        }
+        .material-symbols-rounded {
+            font-family: 'Material Symbols Rounded';
+            font-variation-settings: 'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;
+            line-height: 1; user-select: none;
+            display: inline-flex; align-items: center;
+        }
+        .float-label {
+            position: relative;
+        }
+
+        /* Floating label */
+        .float-label input:not(:placeholder-shown) ~ label,
+        .float-label input:focus ~ label,
+        .float-label input:-webkit-autofill ~ label {
+            transform: translateY(-21px) scale(0.78);
+            color: #4338ca;
+        }
+
+        input:-webkit-autofill {
+            -webkit-box-shadow: 0 0 0 60px #f8fafc inset !important;
+            -webkit-text-fill-color: #111827;
+        }
+
+        .dot-grid {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 16px 16px;
+            opacity: .32;
+            mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+        }
+
+        /* Button spinner */
+        .btn-loading { pointer-events: none; }
+        .btn-loading .btn-text { opacity: 0; }
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 20px; height: 20px;
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen overflow-x-hidden text-gray-900 antialiased">
+    <div class="fixed inset-0 pointer-events-none">
+        <div class="absolute inset-0 dot-grid"></div>
+        <div class="absolute -top-24 -left-14 h-72 w-72 rounded-full bg-brand-300/35 blur-3xl animate-float-soft"></div>
+        <div class="absolute top-16 right-0 h-80 w-80 rounded-full bg-cyan-200/45 blur-3xl animate-float-soft" style="animation-delay:1.4s"></div>
+        <div class="absolute -bottom-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-amber-200/55 blur-3xl animate-float-soft" style="animation-delay:2.2s"></div>
+    </div>
+
+    <main class="relative z-10 min-h-screen px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+        <div class="mx-auto grid w-full max-w-6xl items-stretch gap-5 lg:grid-cols-[1.15fr,0.85fr]">
+            <section class="rounded-3xl border border-white/65 bg-white/60 p-7 shadow-[0_18px_65px_-35px_rgba(79,70,229,.45)] backdrop-blur-xl sm:p-9 lg:p-10 animate-fade-right">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-700 ring-1 ring-brand-100">
+                    <span class="material-symbols-rounded" style="font-size:16px">rocket_launch</span>
+                    BestApp Kontrol Merkezi
+                </div>
+                <h1 class="font-heading mt-6 text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
+                    Botunuzu tek panelden
+                    <span class="text-brand-700">canli ve hizli</span>
+                    yonetin.
+                </h1>
+                <p class="mt-4 max-w-xl text-sm leading-relaxed text-gray-600 sm:text-base">
+                    Grup yonetimi, zamanlanmis gonderimler ve durum takibi icin optimize edilmis BestApp paneline giris yapin.
+                </p>
+
+                <div class="mt-8 grid gap-3 sm:grid-cols-2 animate-reveal" style="animation-delay:.2s">
+                    <article class="rounded-2xl border border-white bg-white/75 p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-brand-700">
+                            <span class="material-symbols-rounded" style="font-size:18px">insights</span>
+                            <span class="text-xs font-semibold uppercase tracking-wide">Anlik Durum</span>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-600">QR, baglanti ve grup sayisi tek bakista gorunsun.</p>
+                    </article>
+                    <article class="rounded-2xl border border-white bg-white/75 p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-brand-700">
+                            <span class="material-symbols-rounded" style="font-size:18px">schedule</span>
+                            <span class="text-xs font-semibold uppercase tracking-wide">Planli Gonderim</span>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-600">Metin, medya ve arsivden icerik secimiyle hizli akis.</p>
+                    </article>
+                    <article class="rounded-2xl border border-white bg-white/75 p-4 shadow-sm sm:col-span-2">
+                        <div class="flex items-center gap-2 text-brand-700">
+                            <span class="material-symbols-rounded" style="font-size:18px">security</span>
+                            <span class="text-xs font-semibold uppercase tracking-wide">Guvenli Erişim</span>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-600">Yetkili kullanici dogrulamasi ile bot yonetimi kontrol altinda.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="animate-fade-up rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_22px_75px_-38px_rgba(15,23,42,.5)] sm:p-8 lg:p-9">
+                <div class="mb-7 flex items-center gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 shadow-md shadow-brand-600/35">
+                        <span class="material-symbols-rounded text-white" style="font-size:22px">smart_toy</span>
+                    </div>
+                    <div>
+                        <h2 class="font-heading text-2xl font-semibold text-gray-900">Giris Yap</h2>
+                        <p class="text-sm text-gray-500">Hesabiniza baglanarak devam edin.</p>
+                    </div>
+                </div>
+
+                <form id="loginForm" novalidate autocomplete="on" class="space-y-4">
+                    <div class="float-label">
+                        <div class="flex items-center gap-3 rounded-2xl border border-gray-200 bg-slate-50 px-4 py-3.5 transition-colors hover:bg-white focus-within:border-brand-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-100">
+                            <span class="material-symbols-rounded text-gray-400" style="font-size:20px">person</span>
+                            <div class="relative flex-1">
+                                <input
+                                    type="text"
+                                    id="username"
+                                    name="username"
+                                    placeholder=" "
+                                    autocomplete="username"
+                                    required
+                                    class="peer w-full bg-transparent pb-0.5 pt-4 text-sm font-semibold text-gray-800 outline-none placeholder-transparent"
+                                >
+                                <label for="username" class="pointer-events-none absolute left-0 top-2.5 origin-left text-sm text-gray-400 transition-all duration-200">
+                                    Kullanici Adi
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="float-label">
+                        <div class="flex items-center gap-3 rounded-2xl border border-gray-200 bg-slate-50 px-4 py-3.5 transition-colors hover:bg-white focus-within:border-brand-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-100">
+                            <span class="material-symbols-rounded text-gray-400" style="font-size:20px">lock</span>
+                            <div class="relative flex-1">
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    placeholder=" "
+                                    autocomplete="current-password"
+                                    required
+                                    class="peer w-full bg-transparent pb-0.5 pt-4 pr-8 text-sm font-semibold text-gray-800 outline-none placeholder-transparent"
+                                >
+                                <label for="password" class="pointer-events-none absolute left-0 top-2.5 origin-left text-sm text-gray-400 transition-all duration-200">
+                                    Sifre
+                                </label>
+                            </div>
+                            <button
+                                type="button"
+                                id="pwToggle"
+                                tabindex="-1"
+                                class="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                                aria-label="Sifreyi goster veya gizle"
+                            >
+                                <span class="material-symbols-rounded" id="pwToggleIcon" style="font-size:20px">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="errorMsg" class="hidden items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                        <span class="material-symbols-rounded flex-shrink-0" style="font-size:18px">error</span>
+                        <span id="errorText"></span>
+                    </div>
+
+                    <button
+                        type="submit"
+                        id="loginBtn"
+                        class="relative mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 py-3.5 text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-600/30 active:translate-y-0"
+                    >
+                        <span class="material-symbols-rounded btn-text" style="font-size:20px">login</span>
+                        <span class="btn-text">Panele Giris Yap</span>
+                    </button>
+                </form>
+
+                <p class="mt-6 text-center text-xs text-gray-400">
+                    BestApp &copy; 2026 - Guvenli Yonetim Paneli
+                </p>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const form      = document.getElementById('loginForm');
+        const usernameI = document.getElementById('username');
+        const passwordI = document.getElementById('password');
+        const pwToggle  = document.getElementById('pwToggle');
+        const pwIcon    = document.getElementById('pwToggleIcon');
+        const loginBtn  = document.getElementById('loginBtn');
+        const errorMsg  = document.getElementById('errorMsg');
+        const errorText = document.getElementById('errorText');
+
+        pwToggle.addEventListener('click', () => {
+            const isPw = passwordI.type === 'password';
+            passwordI.type  = isPw ? 'text' : 'password';
+            pwIcon.textContent = isPw ? 'visibility_off' : 'visibility';
+        });
+
+        function showError(msg) {
+            errorText.textContent = msg;
+            errorMsg.classList.remove('hidden');
+            errorMsg.classList.add('flex');
+        }
+        function hideError() {
+            errorMsg.classList.add('hidden');
+            errorMsg.classList.remove('flex');
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+
+            const username = usernameI.value.trim();
+            const password = passwordI.value;
+
+            if (!username || !password) {
+                showError('Lütfen tüm alanları doldurun.');
+                return;
+            }
+
+            loginBtn.classList.add('btn-loading');
+            loginBtn.disabled = true;
+
+            try {
+                const res  = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showError(data.error || 'Giriş başarısız.');
+                } else {
+                    window.location.href = '/dashboard';
+                }
+            } catch {
+                showError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+            } finally {
+                loginBtn.classList.remove('btn-loading');
+                loginBtn.disabled = false;
+            }
+        });
+
+        [usernameI, passwordI].forEach(el =>
+            el.addEventListener('keydown', e => { if (e.key === 'Enter') form.requestSubmit(); })
+        );
+    </script>
+</body>
+</html>

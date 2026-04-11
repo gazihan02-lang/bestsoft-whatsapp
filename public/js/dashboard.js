@@ -1,0 +1,713 @@
+'use strict';
+
+/* =============================================
+   BestApp Dashboard — Main JS
+   ============================================= */
+
+const socket = io();
+
+// ─── State ───────────────────────────────────
+let currentSection = 'home';
+
+// ─── Group count ───────────────────────────
+function loadGroupCount() {
+    fetch('/api/bot/groups')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('statGroups').textContent = data.count;
+        })
+        .catch(() => {});
+}
+
+// ─── Page title map ──────────────────────────
+const PAGE_TITLES = {
+    home:     'Ana Sayfa',
+    schedule: 'Zamanlama',
+    logs:     'Etkinlik Günlüğü',
+    settings: 'Ayarlar'
+};
+
+// ─── Navigation ──────────────────────────────
+document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+    btn.addEventListener('click', () => navigate(btn.dataset.section));
+});
+
+function navigate(section) {
+    currentSection = section;
+    document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === section);
+    });
+    document.querySelectorAll('.section').forEach(s => {
+        s.classList.toggle('active', s.id === `section-${section}`);
+    });
+    document.getElementById('pageTitle').textContent = PAGE_TITLES[section] || section;
+
+    // Load data on navigate
+    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadArchive(); }
+    if (section === 'logs')     loadLogs();
+    if (section === 'settings') loadSettings();
+    if (section === 'home')     { loadScheduledCount(); loadLogCount(); }
+}
+window.navigate = navigate;
+
+// ─── Snackbar ────────────────────────────────
+const snackbar    = document.getElementById('snackbar');
+const snackbarMsg = document.getElementById('snackbarMsg');
+const snackbarIco = document.getElementById('snackbarIcon');
+let snackTimer;
+
+function showSnack(msg, isError = false) {
+    snackbarMsg.textContent = msg;
+    snackbarIco.textContent = isError ? 'error' : 'check_circle';
+    snackbar.classList.toggle('error', isError);
+    snackbar.classList.add('show');
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(() => snackbar.classList.remove('show'), 3500);
+}
+
+// ─── Logout ──────────────────────────────────
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/';
+});
+
+document.getElementById('waLogoutBtn').addEventListener('click', async () => {
+    if (!confirm('WhatsApp hesabından çıkmak istediğinizden emin misiniz? Yeniden bağlanmak için QR okutmanız gerekecek.')) return;
+    const btn = document.getElementById('waLogoutBtn');
+    btn.disabled = true; btn.style.opacity = '0.7';
+    try {
+        const res = await fetch('/api/bot/wa-logout', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) showSnack(data.error || 'Çıkış yapılamadı.', true);
+        else showSnack('WhatsApp oturumu kapatıldı.');
+    } catch { showSnack('Sunucu hatası.', true); }
+    finally { btn.disabled = false; btn.style.opacity = ''; }
+});
+
+// ─── Bot Status ──────────────────────────────
+function updateBotStatus({ status, message, name, number }) {
+    const chip       = document.getElementById('statusChip');
+    const qrSec      = document.getElementById('qrSection');
+    const initSec    = document.getElementById('initSection');
+    const connSec    = document.getElementById('connectedSection');
+    const discSec    = document.getElementById('disconnectedSection');
+
+    // Hide all
+    qrSec.hidden = initSec.hidden = connSec.hidden = discSec.hidden = true;
+
+    const configs = {
+        initializing: {
+            chipClass: 'chip-status-initializing',
+            icon: 'sync', label: 'Başlatılıyor',
+            show: 'init'
+        },
+        qr_pending: {
+            chipClass: 'chip-status-qr',
+            icon: 'qr_code', label: 'QR Bekleniyor',
+            show: 'qr'
+        },
+        connected: {
+            chipClass: 'chip-status-connected',
+            icon: 'check_circle', label: 'Bağlandı',
+            show: 'conn'
+        },
+        disconnected: {
+            chipClass: 'chip-status-disconnected',
+            icon: 'wifi_off', label: 'Bağlı Değil',
+            show: 'disc'
+        },
+        error: {
+            chipClass: 'chip-status-error',
+            icon: 'error', label: 'Hata',
+            show: 'disc'
+        }
+    };
+
+    const cfg = configs[status] || configs.disconnected;
+
+    chip.className = `chip ${cfg.chipClass}`;
+    chip.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px">${cfg.icon}</span> ${cfg.label}`;
+
+    // Sync header chip
+    const headerChip = document.getElementById('statusChipHeader');
+    if (headerChip) {
+        headerChip.innerHTML = `<div class="chip ${cfg.chipClass}"><span class="material-symbols-rounded" style="font-size:14px">${cfg.icon}</span> ${cfg.label}</div>`;
+    }
+
+    if (cfg.show === 'init') initSec.hidden = false;
+    if (cfg.show === 'qr')   qrSec.hidden   = false;
+    if (cfg.show === 'conn') {
+        connSec.hidden = false;
+        if (name)   document.getElementById('connectedName').textContent   = name;
+        if (number) document.getElementById('connectedNumber').textContent = `+${number}`;
+    }
+    if (cfg.show === 'disc') {
+        discSec.hidden = false;
+        document.getElementById('disconnectedMsg').textContent = message || 'Bot bağlı değil.';
+    }
+
+    // Stat card
+    const labels = { connected: 'Bağlı', disconnected: 'Bağlı Değil', qr_pending: 'QR Bekleniyor', initializing: 'Başlatılıyor', error: 'Hata' };
+    document.getElementById('statStatus').textContent = labels[status] || status;
+}
+
+socket.on('bot:status', ({ status, message }) => updateBotStatus({ status, message }));
+socket.on('bot:groups', ({ count, list }) => {
+    document.getElementById('statGroups').textContent = count;
+    if (list && list.length) { allGroups = list; renderGroupList(list); }
+});
+
+socket.on('bot:ready', ({ status, name, number }) => {
+    updateBotStatus({ status, name, number });
+});
+
+socket.on('bot:qr', (dataUrl) => {
+    if (dataUrl) document.getElementById('qrImage').src = dataUrl;
+});
+
+socket.on('bot:message', () => {
+    // mesaj alındığında log sayısını güncelle
+    loadLogCount();
+});
+
+socket.on('schedule:sent', () => {
+    if (currentSection === 'schedule') loadScheduled();
+    loadScheduledCount();
+});
+
+// Get initial status
+fetch('/api/bot/status')
+    .then(r => r.json())
+    .then(data => updateBotStatus(data))
+    .catch(() => {});
+
+// ─── Stats ───────────────────────────────────
+function loadScheduledCount() {
+    fetch('/api/scheduled')
+        .then(r => r.json())
+        .then(data => { document.getElementById('statScheduled').textContent = data.length; })
+        .catch(() => {});
+}
+
+function loadLogCount() {
+    fetch('/api/logs?limit=200')
+        .then(r => r.json())
+        .then(data => { document.getElementById('statLogs').textContent = data.length; })
+        .catch(() => {});
+}
+
+// ─── Log helpers ─────────────────────────────
+const LOG_ICONS = {
+    info:    { icon: 'info',         cls: 'log-type-info'    },
+    success: { icon: 'check_circle', cls: 'log-type-success' },
+    warning: { icon: 'warning',      cls: 'log-type-warning' },
+    error:   { icon: 'error',        cls: 'log-type-error'   },
+    message: { icon: 'chat',         cls: 'log-type-message' },
+    sent:    { icon: 'send',         cls: 'log-type-sent'    }
+};
+
+function renderLog(log) {
+    const cfg  = LOG_ICONS[log.type] || LOG_ICONS.info;
+    const time = new Date(log.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+    const div  = document.createElement('div');
+    div.className = `log-item ${cfg.cls}`;
+    div.innerHTML = `
+        <span class="log-icon"><span class="material-symbols-rounded">${cfg.icon}</span></span>
+        <span class="log-content">${escHtml(log.content)}</span>
+        <span class="log-time">${time}</span>`;
+    return div;
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderEmptyLog(container) {
+    container.innerHTML = `<div class="empty-state"><span class="material-symbols-rounded">history</span>Henüz kayıt yok</div>`;
+}
+
+function loadLogs() {
+    fetch('/api/logs?limit=100')
+        .then(r => r.json())
+        .then(logs => {
+            const el = document.getElementById('fullLogList');
+            el.innerHTML = '';
+            if (!logs.length) { renderEmptyLog(el); return; }
+            logs.forEach(l => el.appendChild(renderLog(l)));
+            document.getElementById('statLogs').textContent = logs.length;
+        })
+        .catch(() => {});
+}
+
+document.getElementById('refreshLogsBtn').addEventListener('click', loadLogs);
+
+document.getElementById('clearLogsBtn').addEventListener('click', async () => {
+    if (!confirm('Tüm loglar silinecek. Emin misiniz?')) return;
+    const res = await fetch('/api/logs', { method: 'DELETE' });
+    if (res.ok) { loadLogs(); loadLogCount(); showSnack('Loglar temizlendi.'); }
+});
+
+// ─── Scheduled Messages ──────────────────────
+
+/* ======= Grup Seçici ======= */
+let allGroups = [];
+const selectedGroupIds = new Set();
+
+function renderGroupList(groups) {
+    const container = document.getElementById('groupPickerList');
+    if (!groups.length) {
+        container.innerHTML = `<div class="empty-state" style="padding:24px 12px;font-size:0.8rem">
+            <span class="material-symbols-rounded">groups</span>Grup bulunamadı</div>`;
+        return;
+    }
+    container.innerHTML = groups.map(g => `
+        <label class="group-pick-item${selectedGroupIds.has(g.id) ? ' selected' : ''}">
+            <input type="checkbox" value="${escHtml(g.id)}"${selectedGroupIds.has(g.id) ? ' checked' : ''}>
+            <span class="group-pick-name">${escHtml(g.name)}</span>
+        </label>`).join('');
+    container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const label = cb.closest('label');
+            if (cb.checked) { selectedGroupIds.add(cb.value); label.classList.add('selected'); }
+            else            { selectedGroupIds.delete(cb.value); label.classList.remove('selected'); }
+            document.getElementById('selGroupCount').textContent = selectedGroupIds.size;
+        });
+    });
+}
+
+function loadGroupList() {
+    fetch('/api/bot/group-list')
+        .then(r => r.json())
+        .then(data => { allGroups = data; renderGroupList(data); })
+        .catch(() => {});
+}
+
+document.getElementById('selectAllGroups').addEventListener('click', () => {
+    allGroups.forEach(g => selectedGroupIds.add(g.id));
+    renderGroupList(allGroups);
+    document.getElementById('selGroupCount').textContent = selectedGroupIds.size;
+});
+document.getElementById('clearGroupSel').addEventListener('click', () => {
+    selectedGroupIds.clear();
+    renderGroupList(allGroups);
+    document.getElementById('selGroupCount').textContent = 0;
+});
+document.getElementById('groupSearchInput').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderGroupList(allGroups.filter(g => g.name.toLowerCase().includes(q)));
+});
+
+/* ======= İçerik Sekmeleri ======= */
+document.querySelectorAll('.content-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const paneId = 'tab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1);
+        document.getElementById(paneId).classList.add('active');
+    });
+});
+
+/* ======= Medya Yükleme ======= */
+let currentMediaFile = null;
+
+const mediaDropZone = document.getElementById('mediaDropZone');
+const mediaFileInput = document.getElementById('mediaFileInput');
+
+mediaDropZone.addEventListener('click', () => mediaFileInput.click());
+mediaDropZone.addEventListener('dragover', e => { e.preventDefault(); mediaDropZone.classList.add('drag-over'); });
+mediaDropZone.addEventListener('dragleave', () => mediaDropZone.classList.remove('drag-over'));
+mediaDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    mediaDropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setMediaFile(file);
+});
+mediaFileInput.addEventListener('change', () => {
+    if (mediaFileInput.files[0]) setMediaFile(mediaFileInput.files[0]);
+});
+
+function setMediaFile(file) {
+    currentMediaFile = file;
+    const url = URL.createObjectURL(file);
+    const isVideo = file.type.startsWith('video/');
+    document.getElementById('mediaPreviewImg').style.display = isVideo ? 'none' : 'block';
+    document.getElementById('mediaPreviewVid').style.display = isVideo ? 'block' : 'none';
+    if (isVideo) document.getElementById('mediaPreviewVid').src = url;
+    else         document.getElementById('mediaPreviewImg').src = url;
+    document.getElementById('mediaDropZone').style.display = 'none';
+    document.getElementById('mediaPreview').style.display = 'flex';
+}
+
+document.getElementById('removeMediaBtn').addEventListener('click', () => {
+    currentMediaFile = null;
+    mediaFileInput.value = '';
+    document.getElementById('mediaDropZone').style.display = '';
+    document.getElementById('mediaPreview').style.display = 'none';
+    document.getElementById('mediaPreviewImg').src = '';
+    document.getElementById('mediaPreviewVid').src = '';
+});
+
+/* ======= Resim Arşivi Seçici ======= */
+let selectedArchiveImg  = null;
+let archivePickerImages = [];
+
+function loadArchivePicker() {
+    fetch('/api/archive')
+        .then(r => r.json())
+        .then(data => {
+            archivePickerImages = data;
+            renderArchivePicker(data);
+        }).catch(() => {});
+}
+
+function renderArchivePicker(images) {
+    const grid = document.getElementById('archivePickerGrid');
+    if (!images.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:24px;font-size:0.8rem">
+            <span class="material-symbols-rounded">photo_library</span>Arşiv boş — aşağıdan resim ekleyin</div>`;
+        return;
+    }
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(90px, 1fr))';
+    grid.style.gap = '8px';
+    grid.innerHTML = images.map(img => `
+        <div class="archive-item${selectedArchiveImg && selectedArchiveImg.id === img.id ? ' selected' : ''}"
+             data-id="${img.id}" style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;aspect-ratio:1">
+            <img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" style="width:100%;height:100%;object-fit:cover">
+            <div class="archive-name">${escHtml(img.name)}</div>
+        </div>`).join('');
+    grid.querySelectorAll('.archive-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const img = archivePickerImages.find(i => i.id === parseInt(el.dataset.id));
+            if (!img) return;
+            grid.querySelectorAll('.archive-item').forEach(x => x.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedArchiveImg = img;
+            document.getElementById('archiveOverlayEditor').style.display = '';
+            drawOverlayCanvas();
+        });
+    });
+}
+
+/* ======= Canvas Overlay ======= */
+function drawOverlayCanvas() {
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+        canvas.width  = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        const text = document.getElementById('overlayText').value;
+        if (!text) return;
+        const size  = parseInt(document.getElementById('overlaySize').value);
+        const color = document.getElementById('overlayColor').value;
+        const pos   = document.getElementById('overlayPos').value;
+        ctx.font      = `bold ${size}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = Math.max(2, size / 8);
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillStyle = color;
+        let y;
+        if (pos === 'top')    y = size + 16;
+        else if (pos === 'center') y = canvas.height / 2 + size / 3;
+        else                  y = canvas.height - 24;
+        ctx.strokeText(text, canvas.width / 2, y);
+        ctx.fillText(text, canvas.width / 2, y);
+    };
+    img.crossOrigin = 'anonymous';
+    img.src = selectedArchiveImg.path;
+}
+
+['overlayText','overlayColor','overlaySize','overlayPos'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        if (id === 'overlaySize') document.getElementById('overlaySizeVal').textContent = document.getElementById(id).value;
+        if (selectedArchiveImg) drawOverlayCanvas();
+    });
+});
+
+/* ======= Zamanlama Gönder ======= */
+document.getElementById('scheduleBtn').addEventListener('click', async () => {
+    if (!selectedGroupIds.size) { showSnack('En az bir grup seçin.', true); return; }
+
+    const dateStr = document.getElementById('schDate').value;
+    const timeStr = document.getElementById('schTime').value;
+    if (!dateStr || !timeStr) { showSnack('Tarih ve saat girin.', true); return; }
+
+    const sendAt = new Date(`${dateStr}T${timeStr}`);
+    if (isNaN(sendAt.getTime()) || sendAt <= new Date()) {
+        showSnack('Gelecekte bir tarih/saat seçin.', true); return;
+    }
+
+    const activeTab = document.querySelector('.content-tab.active').dataset.tab;
+    const fd = new FormData();
+    fd.append('chatIds', JSON.stringify([...selectedGroupIds]));
+    fd.append('sendAt', sendAt.toISOString());
+
+    if (activeTab === 'text') {
+        const msg = document.getElementById('schTextMessage').value.trim();
+        if (!msg) { showSnack('Mesaj içeriği girin.', true); return; }
+        fd.append('message', msg);
+
+    } else if (activeTab === 'media') {
+        if (!currentMediaFile) { showSnack('Dosya seçin.', true); return; }
+        fd.append('file', currentMediaFile);
+        fd.append('message', document.getElementById('mediaCaption').value.trim());
+
+    } else if (activeTab === 'archive') {
+        if (!selectedArchiveImg) { showSnack('Arşivden bir resim seçin.', true); return; }
+        const canvas = document.getElementById('previewCanvas');
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+        fd.append('file', blob, 'overlay_image.jpg');
+        fd.append('message', document.getElementById('overlayText').value.trim());
+        fd.append('overlayText', document.getElementById('overlayText').value.trim());
+    }
+
+    const btn = document.getElementById('scheduleBtn');
+    btn.disabled = true; btn.style.opacity = '0.7';
+
+    try {
+        const res  = await fetch('/api/scheduled', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { showSnack(data.error || 'Hata oluştu.', true); }
+        else {
+            showSnack(`✅ ${selectedGroupIds.size} gruba zamanlandı!`);
+            resetScheduleForm();
+            loadScheduled();
+            loadScheduledCount();
+        }
+    } catch { showSnack('Sunucu hatası.', true); }
+    finally  { btn.disabled = false; btn.style.opacity = ''; }
+});
+
+function resetScheduleForm() {
+    selectedGroupIds.clear();
+    renderGroupList(allGroups);
+    document.getElementById('selGroupCount').textContent = '0';
+    document.getElementById('schTextMessage').value = '';
+    document.getElementById('schDate').value = '';
+    document.getElementById('schTime').value = '';
+    document.getElementById('mediaCaption').value = '';
+    currentMediaFile = null;
+    document.getElementById('mediaDropZone').style.display = '';
+    document.getElementById('mediaPreview').style.display = 'none';
+    selectedArchiveImg = null;
+    document.getElementById('archiveOverlayEditor').style.display = 'none';
+    document.getElementById('overlayText').value = '';
+    document.querySelectorAll('.archive-item').forEach(x => x.classList.remove('selected'));
+    // Reset to text tab
+    document.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelector('.content-tab[data-tab="text"]').classList.add('active');
+    document.getElementById('tabText').classList.add('active');
+}
+
+document.getElementById('scheduleFormReset').addEventListener('click', resetScheduleForm);
+
+/* ======= Bekleyen Mesajlar Tablosu ======= */
+function loadScheduled() {
+    fetch('/api/scheduled')
+        .then(r => r.json())
+        .then(renderScheduleTable)
+        .catch(() => {});
+}
+
+function renderScheduleTable(msgs) {
+    const tbody = document.getElementById('scheduleTableBody');
+    document.getElementById('statScheduled').textContent = msgs.length;
+
+    if (!msgs.length) {
+        tbody.innerHTML = `<tr><td colspan="4">
+            <div class="empty-state"><span class="material-symbols-rounded">schedule</span>Bekleyen mesaj yok</div>
+        </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = msgs.map(m => {
+        const sendAt = new Date(m.send_at).toLocaleString('tr-TR');
+        let groupCells = '';
+        if (m.chat_ids) {
+            try {
+                const ids = JSON.parse(m.chat_ids);
+                groupCells = `<span class="td-groups-badge"><span class="material-symbols-rounded" style="font-size:13px">groups</span>${ids.length} grup</span>`;
+            } catch {}
+        }
+        if (!groupCells) groupCells = `<span class="td-truncate" style="font-size:0.8rem">${escHtml(m.chat_id)}</span>`;
+
+        const contentLabel = m.media_type === 'image' ? '🖼 Resim'
+                           : m.media_type === 'video' ? '🎥 Video'
+                           : escHtml((m.message || '').substring(0, 60));
+
+        return `<tr>
+            <td>${groupCells}</td>
+            <td class="td-truncate">${contentLabel}</td>
+            <td style="white-space:nowrap">${sendAt}</td>
+            <td>
+                <button onclick="deleteScheduled(${m.id})" title="İptal Et"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                    <span class="material-symbols-rounded" style="font-size:18px">delete</span>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.deleteScheduled = async (id) => {
+    if (!confirm(`#${id} nolu zamanlanmış mesajı iptal etmek istiyor musunuz?`)) return;
+    const res = await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+    if (res.ok) { loadScheduled(); showSnack('Zamanlanmış mesaj iptal edildi.'); }
+    else { showSnack('İptal edilemedi.', true); }
+};
+
+document.getElementById('refreshScheduleBtn').addEventListener('click', loadScheduled);
+
+/* ======= Resim Arşivi Yönetimi ======= */
+let archiveImages = [];
+
+function loadArchive() {
+    fetch('/api/archive')
+        .then(r => r.json())
+        .then(data => {
+            archiveImages = data;
+            renderArchiveGrid(data);
+            renderArchivePicker(data);
+        }).catch(() => {});
+}
+
+function renderArchiveGrid(images) {
+    const grid = document.getElementById('archiveGrid');
+    if (!images.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+            <span class="material-symbols-rounded">photo_library</span>Henüz arşivde resim yok</div>`;
+        return;
+    }
+    grid.innerHTML = images.map(img => `
+        <div class="archive-item" data-id="${img.id}">
+            <img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">
+            <div class="archive-name">${escHtml(img.name)}</div>
+            <button class="archive-del" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
+                <span class="material-symbols-rounded">close</span>
+            </button>
+        </div>`).join('');
+}
+
+window.deleteArchiveImg = async (id, e) => {
+    e.stopPropagation();
+    if (!confirm('Bu resmi arşivden silmek istiyor musunuz?')) return;
+    const res = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
+    if (res.ok) { loadArchive(); showSnack('Resim arşivden silindi.'); }
+    else showSnack('Silinemedi.', true);
+};
+
+const archiveUploadBtn  = document.getElementById('archiveUploadBtn');
+const archiveFileInput  = document.getElementById('archiveFileInput');
+
+archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
+archiveFileInput.addEventListener('change', async () => {
+    const file = archiveFileInput.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('name', file.name.replace(/\.[^.]+$/, ''));
+    archiveUploadBtn.disabled = true;
+    const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
+    archiveUploadBtn.disabled = false;
+    archiveFileInput.value = '';
+    if (res.ok) { loadArchive(); showSnack('Resim arşive eklendi!'); }
+    else { const d = await res.json(); showSnack(d.error || 'Yükleme başarısız.', true); }
+});
+
+
+
+// ─── Settings ────────────────────────────────
+function loadSettings() {
+    fetch('/api/settings')
+        .then(r => r.json())
+        .then(s => {
+            if (s.BOT_NAME)      document.getElementById('settingBotName').value = s.BOT_NAME;
+            if (s.BOT_PREFIX)    document.getElementById('settingPrefix').value   = s.BOT_PREFIX;
+            if (s.OWNER_NUMBER)  document.getElementById('settingOwner').value    = s.OWNER_NUMBER;
+        })
+        .catch(() => {});
+}
+
+document.getElementById('botSettingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const settings = {
+        BOT_NAME:     document.getElementById('settingBotName').value.trim(),
+        BOT_PREFIX:   document.getElementById('settingPrefix').value.trim() || '!',
+        OWNER_NUMBER: document.getElementById('settingOwner').value.trim()
+    };
+
+    try {
+        await Promise.all(Object.entries(settings).map(([key, value]) =>
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value })
+            })
+        ));
+        showSnack('Ayarlar kaydedildi!');
+    } catch { showSnack('Kayıt başarısız.', true); }
+});
+
+document.getElementById('changeUsernameForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newUsername = document.getElementById('newUsername').value.trim();
+    const password    = document.getElementById('usernameConfirmPw').value;
+    if (!newUsername || !password) { showSnack('Tüm alanları doldurun.', true); return; }
+
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.style.opacity = '0.7';
+    try {
+        const res  = await fetch('/auth/change-username', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ newUsername, password })
+        });
+        const data = await res.json();
+        if (!res.ok) showSnack(data.error || 'Hata oluştu.', true);
+        else         { showSnack(`Kullanıcı adı "${data.username}" olarak güncellendi!`); e.target.reset(); }
+    } catch { showSnack('Sunucu hatası.', true); }
+    finally  { btn.disabled = false; btn.style.opacity = ''; }
+});
+
+document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const currentPassword = document.getElementById('currentPw').value;
+    const newPassword     = document.getElementById('newPw').value;
+    if (!currentPassword || !newPassword) { showSnack('Şifreleri doldurun.', true); return; }
+    if (newPassword.length < 6)           { showSnack('Yeni şifre en az 6 karakter olmalı.', true); return; }
+
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.style.opacity = '0.7';
+
+    try {
+        const res  = await fetch('/auth/change-password', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ currentPassword, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) showSnack(data.error || 'Hata oluştu.', true);
+        else         { showSnack('Şifre güncellendi!'); e.target.reset(); }
+    } catch { showSnack('Sunucu hatası.', true); }
+    finally  { btn.disabled = false; btn.style.opacity = ''; }
+});
+
+// ─── Set username in top bar ──────────────────
+(function initUser() {
+    // Extract from cookie or fetch — simple approach: avatar initials hardcoded
+    const uEl = document.getElementById('topBarUsername');
+    const aEl = document.getElementById('topBarAvatar');
+    // We can't easily get the username client-side without an extra endpoint,
+    // but the session is used. Keep avatar as 'A' default.
+})();
+
+// ─── Initial data load ───────────────────────
+loadScheduledCount();
+loadLogCount();
+loadArchive();
