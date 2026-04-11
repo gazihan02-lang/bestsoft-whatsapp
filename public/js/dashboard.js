@@ -757,8 +757,16 @@ archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
 archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
-    const customName = archiveNameInput.value.trim();
-    if (!customName) { showSnack('Yükleme için dosya adı zorunlu.', true); archiveFileInput.value = ''; return; }
+
+    const suggestedName = archiveNameInput.value.trim() || file.name.replace(/\.[^.]+$/, '');
+    const enteredName = window.prompt('Dosya adı girin:', suggestedName);
+    const customName = String(enteredName || '').trim();
+    if (!customName) {
+        showSnack('Dosya adı girilmedi, yükleme iptal edildi.', true);
+        archiveFileInput.value = '';
+        return;
+    }
+    archiveNameInput.value = customName;
 
     const fd = new FormData();
     fd.append('file', file);
