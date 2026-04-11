@@ -333,10 +333,15 @@ function setMediaFile(file) {
     currentMediaFile = file;
     const url = URL.createObjectURL(file);
     const isVideo = file.type.startsWith('video/');
-    document.getElementById('mediaPreviewImg').style.display = isVideo ? 'none' : 'block';
+    const isAudio = file.type.startsWith('audio/');
+    document.getElementById('mediaPreviewImg').style.display = (!isVideo && !isAudio) ? 'block' : 'none';
     document.getElementById('mediaPreviewVid').style.display = isVideo ? 'block' : 'none';
+    document.getElementById('mediaPreviewAud').style.display = isAudio ? 'block' : 'none';
+
     if (isVideo) document.getElementById('mediaPreviewVid').src = url;
-    else         document.getElementById('mediaPreviewImg').src = url;
+    else if (isAudio) document.getElementById('mediaPreviewAud').src = url;
+    else document.getElementById('mediaPreviewImg').src = url;
+
     document.getElementById('mediaDropZone').style.display = 'none';
     document.getElementById('mediaPreview').style.display = 'flex';
 }
@@ -348,11 +353,42 @@ document.getElementById('removeMediaBtn').addEventListener('click', () => {
     document.getElementById('mediaPreview').style.display = 'none';
     document.getElementById('mediaPreviewImg').src = '';
     document.getElementById('mediaPreviewVid').src = '';
+    document.getElementById('mediaPreviewAud').src = '';
 });
 
 /* ======= Resim Arşivi Seçici ======= */
 let selectedArchiveImg  = null;
 let archivePickerImages = [];
+let selectedArchiveFolder = '__all__';
+let selectedArchiveManageFolder = '__all__';
+
+function normalizeFolderName(name) {
+    return String(name || '').trim() || 'Genel';
+}
+
+function filterArchiveByFolder(images, folder) {
+    if (folder === '__all__') return images;
+    return images.filter(img => normalizeFolderName(img.folder) === folder);
+}
+
+function refreshArchiveFolderControls(images) {
+    const folders = [...new Set(images.map(img => normalizeFolderName(img.folder)))].sort((a, b) => a.localeCompare(b, 'tr'));
+    const pickerSel = document.getElementById('archivePickerFolder');
+    const manageSel = document.getElementById('archiveManageFolder');
+    const folderList = document.getElementById('archiveFolderList');
+
+    const options = ['<option value="__all__">Tüm Klasörler</option>']
+        .concat(folders.map(f => `<option value="${escHtml(f)}">${escHtml(f)}</option>`));
+
+    pickerSel.innerHTML = options.join('');
+    manageSel.innerHTML = options.join('');
+    folderList.innerHTML = folders.map(f => `<option value="${escHtml(f)}"></option>`).join('');
+
+    if (!folders.includes(selectedArchiveFolder)) selectedArchiveFolder = '__all__';
+    if (!folders.includes(selectedArchiveManageFolder)) selectedArchiveManageFolder = '__all__';
+    pickerSel.value = selectedArchiveFolder;
+    manageSel.value = selectedArchiveManageFolder;
+}
 
 function loadArchivePicker() {
     fetch('/api/archive')
@@ -364,16 +400,17 @@ function loadArchivePicker() {
 }
 
 function renderArchivePicker(images) {
+    const filtered = filterArchiveByFolder(images, selectedArchiveFolder);
     const grid = document.getElementById('archivePickerGrid');
-    if (!images.length) {
+    if (!filtered.length) {
         grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:24px;font-size:0.8rem">
-            <span class="material-symbols-rounded">photo_library</span>Arşiv boş — aşağıdan resim ekleyin</div>`;
+            <span class="material-symbols-rounded">photo_library</span>Bu klasörde görsel yok</div>`;
         return;
     }
     grid.style.display = 'grid';
     grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(90px, 1fr))';
     grid.style.gap = '8px';
-    grid.innerHTML = images.map(img => `
+    grid.innerHTML = filtered.map(img => `
         <div class="archive-item${selectedArchiveImg && selectedArchiveImg.id === img.id ? ' selected' : ''}"
              data-id="${img.id}" style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;aspect-ratio:1">
             <img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" style="width:100%;height:100%;object-fit:cover">
@@ -446,6 +483,7 @@ document.getElementById('scheduleBtn').addEventListener('click', async () => {
     const fd = new FormData();
     fd.append('chatIds', JSON.stringify([...selectedGroupIds]));
     fd.append('sendAt', sendAt.toISOString());
+    fd.append('repeatType', document.getElementById('repeatType').value || 'none');
 
     if (activeTab === 'text') {
         const msg = document.getElementById('schTextMessage').value.trim();
@@ -490,10 +528,12 @@ function resetScheduleForm() {
     document.getElementById('schTextMessage').value = '';
     document.getElementById('schDate').value = '';
     document.getElementById('schTime').value = '';
+    document.getElementById('repeatType').value = 'none';
     document.getElementById('mediaCaption').value = '';
     currentMediaFile = null;
     document.getElementById('mediaDropZone').style.display = '';
     document.getElementById('mediaPreview').style.display = 'none';
+    document.getElementById('mediaPreviewAud').src = '';
     selectedArchiveImg = null;
     document.getElementById('archiveOverlayEditor').style.display = 'none';
     document.getElementById('overlayText').value = '';
@@ -539,12 +579,16 @@ function renderScheduleTable(msgs) {
 
         const contentLabel = m.media_type === 'image' ? '🖼 Resim'
                            : m.media_type === 'video' ? '🎥 Video'
+                           : m.media_type === 'audio' ? '🎤 Ses'
                            : escHtml((m.message || '').substring(0, 60));
+
+        const repeatMap = { none: 'Tek Sefer', daily: 'Her Gün', weekly: 'Her Hafta', monthly: 'Her Ay' };
+        const repeatLabel = repeatMap[m.repeat_type || 'none'] || 'Tek Sefer';
 
         return `<tr>
             <td>${groupCells}</td>
             <td class="td-truncate">${contentLabel}</td>
-            <td style="white-space:nowrap">${sendAt}</td>
+            <td style="white-space:nowrap">${sendAt}<div style="font-size:.75rem;color:#6b7280">${repeatLabel}</div></td>
             <td>
                 <button onclick="deleteScheduled(${m.id})" title="İptal Et"
                     class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
@@ -572,22 +616,24 @@ function loadArchive() {
         .then(r => r.json())
         .then(data => {
             archiveImages = data;
+            refreshArchiveFolderControls(data);
             renderArchiveGrid(data);
             renderArchivePicker(data);
         }).catch(() => {});
 }
 
 function renderArchiveGrid(images) {
+    const filtered = filterArchiveByFolder(images, selectedArchiveManageFolder);
     const grid = document.getElementById('archiveGrid');
-    if (!images.length) {
+    if (!filtered.length) {
         grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <span class="material-symbols-rounded">photo_library</span>Henüz arşivde resim yok</div>`;
+            <span class="material-symbols-rounded">photo_library</span>Bu klasörde görsel yok</div>`;
         return;
     }
-    grid.innerHTML = images.map(img => `
+    grid.innerHTML = filtered.map(img => `
         <div class="archive-item" data-id="${img.id}">
             <img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">
-            <div class="archive-name">${escHtml(img.name)}</div>
+            <div class="archive-name">${escHtml(normalizeFolderName(img.folder))} / ${escHtml(img.name)}</div>
             <button class="archive-del" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
                 <span class="material-symbols-rounded">close</span>
             </button>
@@ -604,14 +650,27 @@ window.deleteArchiveImg = async (id, e) => {
 
 const archiveUploadBtn  = document.getElementById('archiveUploadBtn');
 const archiveFileInput  = document.getElementById('archiveFileInput');
+const archiveFolderInput = document.getElementById('archiveFolderInput');
 
 archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
+document.getElementById('archivePickerFolder').addEventListener('change', (e) => {
+    selectedArchiveFolder = e.target.value;
+    selectedArchiveImg = null;
+    document.getElementById('archiveOverlayEditor').style.display = 'none';
+    renderArchivePicker(archiveImages);
+});
+document.getElementById('archiveManageFolder').addEventListener('change', (e) => {
+    selectedArchiveManageFolder = e.target.value;
+    renderArchiveGrid(archiveImages);
+});
+
 archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
     const fd = new FormData();
     fd.append('file', file);
     fd.append('name', file.name.replace(/\.[^.]+$/, ''));
+    fd.append('folder', normalizeFolderName(archiveFolderInput.value));
     archiveUploadBtn.disabled = true;
     const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
     archiveUploadBtn.disabled = false;

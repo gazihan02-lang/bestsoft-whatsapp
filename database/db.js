@@ -26,6 +26,7 @@ db.exec(`
     chat_name TEXT,
     message TEXT NOT NULL,
     send_at DATETIME NOT NULL,
+    repeat_type TEXT DEFAULT 'none',
     sent INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -49,6 +50,8 @@ const migrations = [
     'ALTER TABLE scheduled_messages ADD COLUMN media_path TEXT',
     'ALTER TABLE scheduled_messages ADD COLUMN media_type TEXT',
     'ALTER TABLE scheduled_messages ADD COLUMN overlay_text TEXT',
+  "ALTER TABLE scheduled_messages ADD COLUMN repeat_type TEXT DEFAULT 'none'",
+  "ALTER TABLE image_archive ADD COLUMN folder TEXT DEFAULT 'Genel'",
 ];
 for (const sql of migrations) {
     try { db.exec(sql); } catch { /* sütun zaten mevcut */ }
@@ -59,6 +62,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     path TEXT NOT NULL,
+    folder TEXT DEFAULT 'Genel',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);

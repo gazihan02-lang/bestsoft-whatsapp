@@ -6,6 +6,26 @@ const { MessageMedia } = require('whatsapp-web.js');
 // Aktif timeout'ları bellekte tut: id -> timeout handle
 const activeTimeouts = new Map();
 
+function getNextSendAt(currentIso, repeatType) {
+    const base = new Date(currentIso);
+    if (isNaN(base.getTime())) return null;
+
+    const next = new Date(base);
+    if (repeatType === 'daily') next.setDate(next.getDate() + 1);
+    else if (repeatType === 'weekly') next.setDate(next.getDate() + 7);
+    else if (repeatType === 'monthly') next.setMonth(next.getMonth() + 1);
+    else return null;
+
+    // Sunucu gecikmişse gelecekteki ilk zamana kadar ilerlet
+    while (next.getTime() <= Date.now()) {
+        if (repeatType === 'daily') next.setDate(next.getDate() + 1);
+        else if (repeatType === 'weekly') next.setDate(next.getDate() + 7);
+        else if (repeatType === 'monthly') next.setMonth(next.getMonth() + 1);
+        else break;
+    }
+    return next;
+}
+
 /**
  * Bot başladığında veritabanındaki bekleyen mesajları yükler
  */
@@ -42,18 +62,38 @@ function addScheduledTimeout(client, msgObj, delayMs, io = null) {
                 for (const chatId of targets) {
                     if (msgObj.media_path) {
                         const media = MessageMedia.fromFilePath(msgObj.media_path);
-                        await client.sendMessage(chatId, media, { caption: msgObj.message || '' });
+                        if (msgObj.media_type === 'audio') {
+                            await client.sendMessage(chatId, media, { sendAudioAsVoice: true });
+                            if (msgObj.message) await client.sendMessage(chatId, msgObj.message);
+                        } else {
+                            await client.sendMessage(chatId, media, { caption: msgObj.message || '' });
+                        }
                     } else {
                         await client.sendMessage(chatId, msgObj.message || '');
                     }
                 }
             }
-            db.prepare('UPDATE scheduled_messages SET sent = 1 WHERE id = ?').run(id);
+
+            const repeatType = msgObj.repeat_type || 'none';
+            if (repeatType !== 'none') {
+                const nextAt = getNextSendAt(msgObj.send_at, repeatType);
+                if (nextAt) {
+                    const nextIso = nextAt.toISOString();
+                    db.prepare('UPDATE scheduled_messages SET send_at = ? WHERE id = ?').run(nextIso, id);
+                    msgObj.send_at = nextIso;
+                    const nextDelay = Math.max(nextAt.getTime() - Date.now(), 0);
+                    addScheduledTimeout(client, msgObj, nextDelay, io);
+                }
+            } else {
+                db.prepare('UPDATE scheduled_messages SET sent = 1 WHERE id = ?').run(id);
+                activeTimeouts.delete(id);
+            }
+
             if (io) io.emit('schedule:sent', { id });
         } catch (err) {
             console.error(`Zamanlanmış mesaj #${id} gönderilemedi:`, err.message);
         } finally {
-            activeTimeouts.delete(id);
+            if ((msgObj.repeat_type || 'none') === 'none') activeTimeouts.delete(id);
         }
     }, delayMs);
 

@@ -21,7 +21,7 @@ function makeStorage(dest) {
 const uploadMedia   = multer({ storage: makeStorage(UPLOAD_DIR),  limits: { fileSize: 50 * 1024 * 1024 } });
 const uploadArchive = multer({ storage: makeStorage(ARCHIVE_DIR), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const ALLOWED_MEDIA   = new Set(['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime','video/x-matroska']);
+const ALLOWED_MEDIA   = new Set(['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime','video/x-matroska','audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4']);
 const ALLOWED_ARCHIVE = new Set(['image/jpeg','image/png','image/gif','image/webp']);
 
 module.exports = function (io) {
@@ -66,7 +66,7 @@ module.exports = function (io) {
 
     // ── Zamanlanmış mesaj ekle (multipart/form-data) ──────────────
     router.post('/scheduled', uploadMedia.single('file'), async (req, res) => {
-        const { chatIds, sendAt, message, overlayText } = req.body;
+        const { chatIds, sendAt, message, overlayText, repeatType } = req.body;
 
         if (!chatIds) return res.status(400).json({ error: 'chatIds gerekli.' });
         let ids;
@@ -87,6 +87,9 @@ module.exports = function (io) {
             return res.status(400).json({ error: 'Geçerli bir gelecek tarih/saat girin.' });
         }
 
+        const validRepeatTypes = new Set(['none', 'daily', 'weekly', 'monthly']);
+        const repeat = validRepeatTypes.has(String(repeatType || 'none')) ? String(repeatType || 'none') : 'none';
+
         let mediaPath = null;
         let mediaType = null;
         if (req.file) {
@@ -95,7 +98,10 @@ module.exports = function (io) {
                 return res.status(400).json({ error: 'Desteklenmeyen dosya türü.' });
             }
             mediaPath = req.file.path;
-            mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video';
+            if (req.file.mimetype.startsWith('image/')) mediaType = 'image';
+            else if (req.file.mimetype.startsWith('video/')) mediaType = 'video';
+            else if (req.file.mimetype.startsWith('audio/')) mediaType = 'audio';
+            else mediaType = 'file';
         }
 
         if (!message && !mediaPath) return res.status(400).json({ error: 'Mesaj metni veya medya dosyası gerekli.' });
@@ -104,8 +110,8 @@ module.exports = function (io) {
         const delayMs   = sendAtDate.getTime() - Date.now();
 
         const result = db.prepare(
-            'INSERT INTO scheduled_messages (chat_id, chat_ids, message, send_at, media_path, media_type, overlay_text) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).run(ids[0], JSON.stringify(ids), message || '', sendAtStr, mediaPath, mediaType, overlayText || null);
+            'INSERT INTO scheduled_messages (chat_id, chat_ids, message, send_at, media_path, media_type, overlay_text, repeat_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(ids[0], JSON.stringify(ids), message || '', sendAtStr, mediaPath, mediaType, overlayText || null, repeat);
 
         const newId  = result.lastInsertRowid;
         const newMsg = db.prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(newId);
@@ -126,7 +132,13 @@ module.exports = function (io) {
 
     // ── Resim arşivini listele ────────────────────────────────────
     router.get('/archive', (req, res) => {
-        const rows = db.prepare('SELECT * FROM image_archive ORDER BY created_at DESC').all();
+        const rows = db.prepare("SELECT id, name, path, COALESCE(folder, 'Genel') AS folder, created_at FROM image_archive ORDER BY folder ASC, created_at DESC").all();
+        res.json(rows);
+    });
+
+    // ── Arşiv klasörlerini listele ───────────────────────────────
+    router.get('/archive/folders', (req, res) => {
+        const rows = db.prepare("SELECT COALESCE(folder, 'Genel') AS folder, COUNT(*) AS count FROM image_archive GROUP BY COALESCE(folder, 'Genel') ORDER BY folder ASC").all();
         res.json(rows);
     });
 
@@ -137,9 +149,10 @@ module.exports = function (io) {
             try { fs.unlinkSync(req.file.path); } catch {}
             return res.status(400).json({ error: 'Sadece resim (JPG, PNG, GIF, WebP) yüklenebilir.' });
         }
+        const folder  = String(req.body.folder || 'Genel').trim().substring(0, 60) || 'Genel';
         const name    = (req.body.name || req.file.originalname).substring(0, 100);
         const webPath = '/media/archive/' + req.file.filename;
-        const result  = db.prepare('INSERT INTO image_archive (name, path) VALUES (?, ?)').run(name, webPath);
+        const result  = db.prepare('INSERT INTO image_archive (name, path, folder) VALUES (?, ?, ?)').run(name, webPath, folder);
         const newRow  = db.prepare('SELECT * FROM image_archive WHERE id = ?').get(result.lastInsertRowid);
         res.json({ success: true, data: newRow });
     });
