@@ -151,15 +151,15 @@ module.exports = function (io) {
         const params = [];
 
         if (['image', 'video', 'audio'].includes(type)) {
-            sql += ' AND COALESCE(media_type, \"image\") = ?';
+            sql += " AND COALESCE(media_type, 'image') = ?";
             params.push(type);
         }
         if (folder && folder !== '__all__') {
-            sql += ' AND COALESCE(folder, \"Genel\") = ?';
+            sql += " AND COALESCE(folder, 'Genel') = ?";
             params.push(folder);
         }
         if (q) {
-            sql += ' AND (LOWER(name) LIKE ? OR LOWER(COALESCE(folder, \"Genel\")) LIKE ?)';
+            sql += " AND (LOWER(name) LIKE ? OR LOWER(COALESCE(folder, 'Genel')) LIKE ?)";
             params.push(`%${q}%`, `%${q}%`);
         }
 
