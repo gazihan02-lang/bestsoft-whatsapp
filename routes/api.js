@@ -19,13 +19,16 @@ function makeStorage(dest) {
     });
 }
 const uploadMedia   = multer({ storage: makeStorage(UPLOAD_DIR),  limits: { fileSize: 50 * 1024 * 1024 } });
-const uploadArchive = multer({ storage: makeStorage(ARCHIVE_DIR), limits: { fileSize: 100 * 1024 * 1024 } });
+const uploadArchive = multer({ storage: makeStorage(ARCHIVE_DIR), limits: { fileSize: 1024 * 1024 * 1024 } });
 
 const ALLOWED_MEDIA   = new Set(['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime','video/x-matroska','audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4']);
 const ALLOWED_ARCHIVE = new Set([
-    'image/jpeg','image/png','image/gif','image/webp',
-    'video/mp4','video/quicktime','video/x-matroska','video/webm',
-    'audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4'
+    // images
+    'image/jpeg','image/jpg','image/png','image/gif','image/webp','image/bmp','image/tiff','image/svg+xml','image/heic','image/heif',
+    // videos
+    'video/mp4','video/quicktime','video/x-matroska','video/webm','video/avi','video/x-msvideo','video/mpeg','video/3gpp','video/3gpp2','video/x-flv','video/x-ms-wmv',
+    // audios
+    'audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4','audio/flac','audio/x-flac','audio/opus','audio/amr','audio/3gpp','audio/3gpp2'
 ]);
 
 function archiveTypeFromMime(mime = '') {
