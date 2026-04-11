@@ -52,6 +52,7 @@ const migrations = [
     'ALTER TABLE scheduled_messages ADD COLUMN overlay_text TEXT',
   "ALTER TABLE scheduled_messages ADD COLUMN repeat_type TEXT DEFAULT 'none'",
   "ALTER TABLE image_archive ADD COLUMN folder TEXT DEFAULT 'Genel'",
+  "ALTER TABLE image_archive ADD COLUMN media_type TEXT DEFAULT 'image'",
 ];
 for (const sql of migrations) {
     try { db.exec(sql); } catch { /* sütun zaten mevcut */ }
@@ -63,9 +64,22 @@ db.exec(`
     name TEXT NOT NULL,
     path TEXT NOT NULL,
     folder TEXT DEFAULT 'Genel',
+    media_type TEXT DEFAULT 'image',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS archive_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, media_type)
+  );
+`);
+
+try { db.exec("UPDATE image_archive SET media_type = 'image' WHERE media_type IS NULL OR media_type = ''"); } catch {}
 
 // Varsayılan admin kullanıcısı (yoksa oluştur)
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();

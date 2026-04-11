@@ -142,6 +142,12 @@
         </div>
         <span class="nav-label text-sm text-gray-600">Zamanlama</span>
       </button>
+      <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="archives">
+        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
+          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">folder_open</span>
+        </div>
+        <span class="nav-label text-sm text-gray-600">Arşivler</span>
+      </button>
       <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="logs">
         <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
           <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">history</span>
@@ -478,34 +484,6 @@
           </div>
         </div>
 
-        <!-- Image archive management -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 class="font-semibold text-gray-900">Resim Arşivi</h2>
-            <div class="flex items-center gap-2">
-              <select id="archiveManageFolder" class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-indigo-400 bg-white">
-                <option value="__all__">Tüm Klasörler</option>
-              </select>
-              <input id="archiveFolderInput" type="text" list="archiveFolderList" value="Genel" placeholder="Klasör adı"
-                class="w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 bg-white">
-              <datalist id="archiveFolderList"></datalist>
-              <button id="archiveUploadBtn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors">
-                <span class="material-symbols-rounded" style="font-size:16px">add_photo_alternate</span>
-                Resim Ekle
-              </button>
-              <input type="file" id="archiveFileInput" accept="image/*" class="hidden">
-            </div>
-          </div>
-          <div class="p-4">
-            <div id="archiveGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-              <div class="empty-state col-span-full">
-                <span class="material-symbols-rounded">photo_library</span>
-                Henüz arşivde resim yok
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Pending scheduled messages table -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -538,6 +516,61 @@
           </div>
         </div>
 
+      </section>
+
+
+      <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           ARCHIVES
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+      <section class="section" id="section-archives">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <h2 class="font-semibold text-gray-900">Arşivler</h2>
+            <div class="flex flex-wrap items-center gap-2">
+              <button class="archive-type-btn px-3 py-2 text-sm rounded-xl bg-indigo-600 text-white" data-type="image">Görsel Arşivi</button>
+              <button class="archive-type-btn px-3 py-2 text-sm rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200" data-type="audio">Ses Arşivi</button>
+              <button class="archive-type-btn px-3 py-2 text-sm rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200" data-type="video">Video Arşivi</button>
+            </div>
+          </div>
+
+          <div class="p-4 lg:p-5">
+            <div class="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-4">
+              <div class="border border-gray-200 rounded-xl p-3 bg-gray-50">
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Klasörler</div>
+                <div class="flex gap-2 mb-2">
+                  <input id="archiveNewFolder" type="text" placeholder="Yeni klasör (örn: Kampanya/Nisan)"
+                    class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 bg-white">
+                  <button id="archiveCreateFolderBtn" class="px-3 py-2 text-sm rounded-lg text-indigo-700 bg-indigo-100 hover:bg-indigo-200">Ekle</button>
+                </div>
+                <div id="archiveFolderListPanel" class="max-h-72 overflow-y-auto flex flex-col gap-1"></div>
+              </div>
+
+              <div>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3">
+                  <input id="archiveSearchInput" type="text" placeholder="Arşivde ara (ad/klasör)"
+                    class="md:col-span-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 bg-white">
+                  <input id="archiveNameInput" type="text" placeholder="Dosya adı (zorunlu)"
+                    class="md:col-span-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 bg-white">
+                  <input id="archiveFolderInput" type="text" list="archiveFolderList" value="Genel" placeholder="Klasör"
+                    class="md:col-span-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 bg-white">
+                  <button id="archiveUploadBtn" class="md:col-span-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors">
+                    <span class="material-symbols-rounded" style="font-size:16px">upload_file</span>
+                    Yükle
+                  </button>
+                  <input type="file" id="archiveFileInput" accept="image/*,video/*,audio/*" class="hidden">
+                  <datalist id="archiveFolderList"></datalist>
+                </div>
+
+                <div id="archiveGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  <div class="empty-state col-span-full">
+                    <span class="material-symbols-rounded">folder_open</span>
+                    Arşiv boş
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
 
@@ -691,6 +724,10 @@
     <button class="mobile-nav-btn nav-item flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors" data-section="schedule">
       <span class="mob-icon material-symbols-rounded text-gray-400 transition-colors" style="font-size:22px">schedule</span>
       <span class="mob-label text-[10px] text-gray-400 transition-colors">Zamanlama</span>
+    </button>
+    <button class="mobile-nav-btn nav-item flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors" data-section="archives">
+      <span class="mob-icon material-symbols-rounded text-gray-400 transition-colors" style="font-size:22px">folder_open</span>
+      <span class="mob-label text-[10px] text-gray-400 transition-colors">Arşivler</span>
     </button>
     <button class="mobile-nav-btn nav-item flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors" data-section="logs">
       <span class="mob-icon material-symbols-rounded text-gray-400 transition-colors" style="font-size:22px">history</span>

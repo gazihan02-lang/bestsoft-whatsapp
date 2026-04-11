@@ -19,10 +19,21 @@ function makeStorage(dest) {
     });
 }
 const uploadMedia   = multer({ storage: makeStorage(UPLOAD_DIR),  limits: { fileSize: 50 * 1024 * 1024 } });
-const uploadArchive = multer({ storage: makeStorage(ARCHIVE_DIR), limits: { fileSize: 10 * 1024 * 1024 } });
+const uploadArchive = multer({ storage: makeStorage(ARCHIVE_DIR), limits: { fileSize: 100 * 1024 * 1024 } });
 
 const ALLOWED_MEDIA   = new Set(['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime','video/x-matroska','audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4']);
-const ALLOWED_ARCHIVE = new Set(['image/jpeg','image/png','image/gif','image/webp']);
+const ALLOWED_ARCHIVE = new Set([
+    'image/jpeg','image/png','image/gif','image/webp',
+    'video/mp4','video/quicktime','video/x-matroska','video/webm',
+    'audio/mpeg','audio/mp3','audio/wav','audio/ogg','audio/aac','audio/webm','audio/x-m4a','audio/mp4'
+]);
+
+function archiveTypeFromMime(mime = '') {
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('audio/')) return 'audio';
+    return 'other';
+}
 
 module.exports = function (io) {
     const router = express.Router();
@@ -130,34 +141,98 @@ module.exports = function (io) {
         res.json({ success: true });
     });
 
-    // ── Resim arşivini listele ────────────────────────────────────
+    // ── Arşiv öğelerini listele ───────────────────────────────────
     router.get('/archive', (req, res) => {
-        const rows = db.prepare("SELECT id, name, path, COALESCE(folder, 'Genel') AS folder, created_at FROM image_archive ORDER BY folder ASC, created_at DESC").all();
+        const type = String(req.query.type || '').trim();
+        const q = String(req.query.q || '').trim().toLowerCase();
+        const folder = String(req.query.folder || '').trim();
+
+        let sql = "SELECT id, name, path, COALESCE(folder, 'Genel') AS folder, COALESCE(media_type, 'image') AS media_type, created_at FROM image_archive WHERE 1=1";
+        const params = [];
+
+        if (['image', 'video', 'audio'].includes(type)) {
+            sql += ' AND COALESCE(media_type, \"image\") = ?';
+            params.push(type);
+        }
+        if (folder && folder !== '__all__') {
+            sql += ' AND COALESCE(folder, \"Genel\") = ?';
+            params.push(folder);
+        }
+        if (q) {
+            sql += ' AND (LOWER(name) LIKE ? OR LOWER(COALESCE(folder, \"Genel\")) LIKE ?)';
+            params.push(`%${q}%`, `%${q}%`);
+        }
+
+        sql += ' ORDER BY folder ASC, created_at DESC';
+        const rows = db.prepare(sql).all(...params);
         res.json(rows);
     });
 
     // ── Arşiv klasörlerini listele ───────────────────────────────
     router.get('/archive/folders', (req, res) => {
-        const rows = db.prepare("SELECT COALESCE(folder, 'Genel') AS folder, COUNT(*) AS count FROM image_archive GROUP BY COALESCE(folder, 'Genel') ORDER BY folder ASC").all();
-        res.json(rows);
+        const type = String(req.query.type || '').trim();
+        let sql = "SELECT COALESCE(folder, 'Genel') AS folder, COUNT(*) AS count FROM image_archive";
+        const params = [];
+        if (['image', 'video', 'audio'].includes(type)) {
+            sql += " WHERE COALESCE(media_type, 'image') = ?";
+            params.push(type);
+        }
+        sql += " GROUP BY COALESCE(folder, 'Genel') ORDER BY folder ASC";
+        const rows = db.prepare(sql).all(...params);
+
+        const createdFolders = ['image', 'video', 'audio'].includes(type)
+            ? db.prepare('SELECT name AS folder, 0 AS count FROM archive_folders WHERE media_type = ? ORDER BY name ASC').all(type)
+            : db.prepare('SELECT name AS folder, 0 AS count FROM archive_folders ORDER BY name ASC').all();
+
+        const byFolder = new Map();
+        [...createdFolders, ...rows].forEach(r => {
+            const key = String(r.folder || 'Genel');
+            const prev = byFolder.get(key);
+            byFolder.set(key, { folder: key, count: (prev?.count || 0) + (r.count || 0) });
+        });
+
+        res.json([...byFolder.values()].sort((a, b) => a.folder.localeCompare(b.folder, 'tr')));
     });
 
-    // ── Arşive resim yükle ────────────────────────────────────────
+    // ── Arşiv klasörü oluştur ────────────────────────────────────
+    router.post('/archive/folders', (req, res) => {
+        const name = String(req.body.name || '').trim().substring(0, 60);
+        const mediaType = String(req.body.mediaType || '').trim();
+        if (!name) return res.status(400).json({ error: 'Klasör adı zorunlu.' });
+        if (!['image', 'video', 'audio'].includes(mediaType)) return res.status(400).json({ error: 'Geçersiz arşiv türü.' });
+
+        db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(name, mediaType);
+        res.json({ success: true });
+    });
+
+    // ── Arşive medya yükle ────────────────────────────────────────
     router.post('/archive/upload', uploadArchive.single('file'), (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'Dosya gerekli.' });
         if (!ALLOWED_ARCHIVE.has(req.file.mimetype)) {
             try { fs.unlinkSync(req.file.path); } catch {}
-            return res.status(400).json({ error: 'Sadece resim (JPG, PNG, GIF, WebP) yüklenebilir.' });
+            return res.status(400).json({ error: 'Sadece görsel, video veya ses dosyası yüklenebilir.' });
         }
+        const rawName = String(req.body.name || '').trim();
+        if (!rawName) {
+            try { fs.unlinkSync(req.file.path); } catch {}
+            return res.status(400).json({ error: 'Arşive eklemek için ad zorunlu.' });
+        }
+
         const folder  = String(req.body.folder || 'Genel').trim().substring(0, 60) || 'Genel';
-        const name    = (req.body.name || req.file.originalname).substring(0, 100);
+        const name    = rawName.substring(0, 100);
         const webPath = '/media/archive/' + req.file.filename;
-        const result  = db.prepare('INSERT INTO image_archive (name, path, folder) VALUES (?, ?, ?)').run(name, webPath, folder);
+        const mediaType = archiveTypeFromMime(req.file.mimetype);
+        if (!['image', 'video', 'audio'].includes(mediaType)) {
+            try { fs.unlinkSync(req.file.path); } catch {}
+            return res.status(400).json({ error: 'Arşiv türü desteklenmiyor.' });
+        }
+        db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(folder, mediaType);
+        const result  = db.prepare('INSERT INTO image_archive (name, path, folder, media_type) VALUES (?, ?, ?, ?)').run(name, webPath, folder, mediaType);
         const newRow  = db.prepare('SELECT * FROM image_archive WHERE id = ?').get(result.lastInsertRowid);
         res.json({ success: true, data: newRow });
     });
 
-    // ── Arşivden resim sil ────────────────────────────────────────
+    // ── Arşivden medya sil ────────────────────────────────────────
     router.delete('/archive/:id', (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });

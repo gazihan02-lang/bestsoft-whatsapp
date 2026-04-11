@@ -23,6 +23,7 @@ function loadGroupCount() {
 const PAGE_TITLES = {
     home:     'Ana Sayfa',
     schedule: 'Zamanlama',
+    archives: 'Arşivler',
     logs:     'Etkinlik Günlüğü',
     settings: 'Ayarlar'
 };
@@ -43,7 +44,8 @@ function navigate(section) {
     document.getElementById('pageTitle').textContent = PAGE_TITLES[section] || section;
 
     // Load data on navigate
-    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadArchive(); }
+    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadArchivePicker(); }
+    if (section === 'archives') loadArchive();
     if (section === 'logs')     loadLogs();
     if (section === 'settings') loadSettings();
     if (section === 'home')     { loadScheduledCount(); loadLogCount(); }
@@ -361,6 +363,8 @@ let selectedArchiveImg  = null;
 let archivePickerImages = [];
 let selectedArchiveFolder = '__all__';
 let selectedArchiveManageFolder = '__all__';
+let currentArchiveType = 'image';
+let archiveSearchText = '';
 
 function normalizeFolderName(name) {
     return String(name || '').trim() || 'Genel';
@@ -371,32 +375,31 @@ function filterArchiveByFolder(images, folder) {
     return images.filter(img => normalizeFolderName(img.folder) === folder);
 }
 
-function refreshArchiveFolderControls(images) {
-    const folders = [...new Set(images.map(img => normalizeFolderName(img.folder)))].sort((a, b) => a.localeCompare(b, 'tr'));
+function refreshArchivePickerFolderControl(folders) {
     const pickerSel = document.getElementById('archivePickerFolder');
-    const manageSel = document.getElementById('archiveManageFolder');
-    const folderList = document.getElementById('archiveFolderList');
+    if (!pickerSel) return;
 
     const options = ['<option value="__all__">Tüm Klasörler</option>']
         .concat(folders.map(f => `<option value="${escHtml(f)}">${escHtml(f)}</option>`));
 
     pickerSel.innerHTML = options.join('');
-    manageSel.innerHTML = options.join('');
-    folderList.innerHTML = folders.map(f => `<option value="${escHtml(f)}"></option>`).join('');
-
     if (!folders.includes(selectedArchiveFolder)) selectedArchiveFolder = '__all__';
-    if (!folders.includes(selectedArchiveManageFolder)) selectedArchiveManageFolder = '__all__';
     pickerSel.value = selectedArchiveFolder;
-    manageSel.value = selectedArchiveManageFolder;
 }
 
 function loadArchivePicker() {
-    fetch('/api/archive')
+    const folderParam = selectedArchiveFolder !== '__all__' ? `&folder=${encodeURIComponent(selectedArchiveFolder)}` : '';
+    fetch(`/api/archive?type=image${folderParam}`)
         .then(r => r.json())
         .then(data => {
             archivePickerImages = data;
             renderArchivePicker(data);
         }).catch(() => {});
+
+    fetch('/api/archive/folders?type=image')
+        .then(r => r.json())
+        .then(rows => refreshArchivePickerFolderControl(rows.map(r => normalizeFolderName(r.folder))))
+        .catch(() => {});
 }
 
 function renderArchivePicker(images) {
@@ -428,6 +431,13 @@ function renderArchivePicker(images) {
         });
     });
 }
+
+document.getElementById('archivePickerFolder')?.addEventListener('change', (e) => {
+    selectedArchiveFolder = e.target.value;
+    selectedArchiveImg = null;
+    document.getElementById('archiveOverlayEditor').style.display = 'none';
+    loadArchivePicker();
+});
 
 /* ======= Canvas Overlay ======= */
 function drawOverlayCanvas() {
@@ -611,33 +621,84 @@ document.getElementById('refreshScheduleBtn').addEventListener('click', loadSche
 /* ======= Resim Arşivi Yönetimi ======= */
 let archiveImages = [];
 
+function renderArchiveTypeButtons() {
+    document.querySelectorAll('.archive-type-btn').forEach(btn => {
+        const active = btn.dataset.type === currentArchiveType;
+        btn.className = active
+            ? 'archive-type-btn px-3 py-2 text-sm rounded-xl bg-indigo-600 text-white'
+            : 'archive-type-btn px-3 py-2 text-sm rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200';
+    });
+}
+
+function renderArchiveFolderPanel(rows) {
+    const panel = document.getElementById('archiveFolderListPanel');
+    const folders = rows.map(r => normalizeFolderName(r.folder));
+
+    if (!folders.includes(selectedArchiveManageFolder)) selectedArchiveManageFolder = '__all__';
+
+    const allBtn = `<button class="w-full text-left px-3 py-2 rounded-lg text-sm ${selectedArchiveManageFolder === '__all__' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}" data-folder="__all__">Tüm Klasörler</button>`;
+    const folderBtns = folders.map(f => `
+        <button class="w-full text-left px-3 py-2 rounded-lg text-sm ${selectedArchiveManageFolder === f ? 'bg-indigo-100 text-indigo-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}" data-folder="${escHtml(f)}">
+            ${escHtml(f)}
+        </button>`).join('');
+
+    panel.innerHTML = allBtn + folderBtns;
+    panel.querySelectorAll('button[data-folder]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedArchiveManageFolder = btn.dataset.folder;
+            loadArchive();
+        });
+    });
+
+    const manageInput = document.getElementById('archiveFolderInput');
+    if (manageInput && (!manageInput.value || manageInput.value === '__all__')) manageInput.value = 'Genel';
+
+    document.getElementById('archiveFolderList').innerHTML = folders.map(f => `<option value="${escHtml(f)}"></option>`).join('');
+}
+
 function loadArchive() {
-    fetch('/api/archive')
-        .then(r => r.json())
-        .then(data => {
-            archiveImages = data;
-            refreshArchiveFolderControls(data);
-            renderArchiveGrid(data);
-            renderArchivePicker(data);
-        }).catch(() => {});
+    const folderParam = selectedArchiveManageFolder !== '__all__' ? `&folder=${encodeURIComponent(selectedArchiveManageFolder)}` : '';
+    const searchParam = archiveSearchText ? `&q=${encodeURIComponent(archiveSearchText)}` : '';
+
+    Promise.all([
+        fetch(`/api/archive?type=${encodeURIComponent(currentArchiveType)}${folderParam}${searchParam}`).then(r => r.json()),
+        fetch(`/api/archive/folders?type=${encodeURIComponent(currentArchiveType)}`).then(r => r.json())
+    ]).then(([items, folders]) => {
+        archiveImages = items;
+        renderArchiveTypeButtons();
+        renderArchiveFolderPanel(folders);
+        renderArchiveGrid(items);
+    }).catch(() => {});
+
+    // Schedule ekranındaki arşiv seçici her zaman görselleri kullanır.
+    loadArchivePicker();
 }
 
 function renderArchiveGrid(images) {
-    const filtered = filterArchiveByFolder(images, selectedArchiveManageFolder);
     const grid = document.getElementById('archiveGrid');
-    if (!filtered.length) {
+    if (!images.length) {
         grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
             <span class="material-symbols-rounded">photo_library</span>Bu klasörde görsel yok</div>`;
         return;
     }
-    grid.innerHTML = filtered.map(img => `
+
+    grid.innerHTML = images.map(img => {
+        const mediaType = img.media_type || 'image';
+        const preview = mediaType === 'image'
+            ? `<img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">`
+            : mediaType === 'video'
+                ? `<video src="${escHtml(img.path)}" class="w-full h-full object-cover" muted preload="metadata"></video>`
+                : `<div class="w-full h-full flex items-center justify-center bg-slate-100"><span class="material-symbols-rounded text-4xl text-slate-500">graphic_eq</span></div>`;
+        const icon = mediaType === 'image' ? 'image' : mediaType === 'video' ? 'movie' : 'mic';
+        return `
         <div class="archive-item" data-id="${img.id}">
-            <img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">
-            <div class="archive-name">${escHtml(normalizeFolderName(img.folder))} / ${escHtml(img.name)}</div>
+            ${preview}
+            <div class="archive-name"><span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">${icon}</span> ${escHtml(normalizeFolderName(img.folder))} / ${escHtml(img.name)}</div>
             <button class="archive-del" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
                 <span class="material-symbols-rounded">close</span>
             </button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 window.deleteArchiveImg = async (id, e) => {
@@ -651,33 +712,74 @@ window.deleteArchiveImg = async (id, e) => {
 const archiveUploadBtn  = document.getElementById('archiveUploadBtn');
 const archiveFileInput  = document.getElementById('archiveFileInput');
 const archiveFolderInput = document.getElementById('archiveFolderInput');
+const archiveNameInput = document.getElementById('archiveNameInput');
+
+function syncArchiveFileAccept() {
+    if (currentArchiveType === 'image') archiveFileInput.accept = 'image/*';
+    else if (currentArchiveType === 'video') archiveFileInput.accept = 'video/*';
+    else archiveFileInput.accept = 'audio/*';
+}
+
+document.querySelectorAll('.archive-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentArchiveType = btn.dataset.type;
+        selectedArchiveManageFolder = '__all__';
+        syncArchiveFileAccept();
+        loadArchive();
+    });
+});
+
+document.getElementById('archiveSearchInput')?.addEventListener('input', (e) => {
+    archiveSearchText = e.target.value.trim();
+    loadArchive();
+});
+
+document.getElementById('archiveCreateFolderBtn')?.addEventListener('click', async () => {
+    const value = normalizeFolderName(document.getElementById('archiveNewFolder').value);
+    if (!value) return;
+    try {
+        const res = await fetch('/api/archive/folders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: value, mediaType: currentArchiveType })
+        });
+        const data = await res.json();
+        if (!res.ok) { showSnack(data.error || 'Klasör oluşturulamadı.', true); return; }
+        archiveFolderInput.value = value;
+        selectedArchiveManageFolder = value;
+        document.getElementById('archiveNewFolder').value = '';
+        loadArchive();
+        showSnack(`Klasör oluşturuldu: ${value}`);
+    } catch {
+        showSnack('Klasör oluşturulamadı.', true);
+    }
+});
 
 archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
-document.getElementById('archivePickerFolder').addEventListener('change', (e) => {
-    selectedArchiveFolder = e.target.value;
-    selectedArchiveImg = null;
-    document.getElementById('archiveOverlayEditor').style.display = 'none';
-    renderArchivePicker(archiveImages);
-});
-document.getElementById('archiveManageFolder').addEventListener('change', (e) => {
-    selectedArchiveManageFolder = e.target.value;
-    renderArchiveGrid(archiveImages);
-});
 
 archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
+    const customName = archiveNameInput.value.trim();
+    if (!customName) { showSnack('Yükleme için dosya adı zorunlu.', true); archiveFileInput.value = ''; return; }
+
+    if (currentArchiveType === 'image' && !file.type.startsWith('image/')) { showSnack('Görsel arşivi için görsel seçin.', true); archiveFileInput.value = ''; return; }
+    if (currentArchiveType === 'video' && !file.type.startsWith('video/')) { showSnack('Video arşivi için video seçin.', true); archiveFileInput.value = ''; return; }
+    if (currentArchiveType === 'audio' && !file.type.startsWith('audio/')) { showSnack('Ses arşivi için ses dosyası seçin.', true); archiveFileInput.value = ''; return; }
+
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('name', file.name.replace(/\.[^.]+$/, ''));
+    fd.append('name', customName);
     fd.append('folder', normalizeFolderName(archiveFolderInput.value));
     archiveUploadBtn.disabled = true;
     const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
     archiveUploadBtn.disabled = false;
     archiveFileInput.value = '';
-    if (res.ok) { loadArchive(); showSnack('Resim arşive eklendi!'); }
+    if (res.ok) { loadArchive(); archiveNameInput.value = ''; showSnack('Dosya arşive eklendi!'); }
     else { const d = await res.json(); showSnack(d.error || 'Yükleme başarısız.', true); }
 });
+
+syncArchiveFileAccept();
 
 
 
