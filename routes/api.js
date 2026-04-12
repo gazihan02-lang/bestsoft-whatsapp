@@ -78,6 +78,15 @@ function renameArchivePath(oldPath, nextPath) {
     }
 }
 
+function getArchiveFileSize(webPath = '') {
+    try {
+        const abs = path.join(ARCHIVE_DIR, path.basename(String(webPath || '')));
+        return fs.statSync(abs).size || 0;
+    } catch {
+        return 0;
+    }
+}
+
 module.exports = function (io) {
     const router = express.Router();
     const botClient = require('../bot/client');
@@ -218,7 +227,10 @@ module.exports = function (io) {
         }
 
         sql += ' ORDER BY created_at DESC';
-        const rows = db.prepare(sql).all(...params);
+        const rows = db.prepare(sql).all(...params).map(row => ({
+            ...row,
+            size_bytes: getArchiveFileSize(row.path)
+        }));
         res.json(rows);
     });
 
@@ -332,6 +344,24 @@ module.exports = function (io) {
         if (!row) return res.status(404).json({ error: 'Bulunamadı.' });
 
         db.prepare('UPDATE image_archive SET name = ? WHERE id = ?').run(name, id);
+        res.json({ success: true });
+    });
+
+    // ── Arşiv öğesini klasöre taşı ──────────────────────────────
+    router.patch('/archive/:id/move', (req, res) => {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
+
+        const row = db.prepare('SELECT id FROM image_archive WHERE id = ?').get(id);
+        if (!row) return res.status(404).json({ error: 'Bulunamadı.' });
+
+        const rawFolder = String(req.body.folder || '').trim();
+        const folder = rawFolder ? normalizeArchivePath(rawFolder) : 'Genel';
+        if (folder !== 'Genel') {
+            db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(folder, 'all');
+        }
+
+        db.prepare('UPDATE image_archive SET folder = ? WHERE id = ?').run(folder, id);
         res.json({ success: true });
     });
 

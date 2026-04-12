@@ -640,6 +640,19 @@ function getArchivePathParent(pathValue = '') {
     return parts.join('/');
 }
 
+function formatArchiveSize(bytes = 0) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return `${n} B`;
+    const units = ['KB', 'MB', 'GB'];
+    let value = n / 1024;
+    let idx = 0;
+    while (value >= 1024 && idx < units.length - 1) {
+        value /= 1024;
+        idx += 1;
+    }
+    return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx]}`;
+}
+
 function getDirectChildFolders(rows, parentPath, query = '') {
     const parent = normalizeArchiveBrowserPath(parentPath);
     const search = String(query || '').trim().toLowerCase();
@@ -712,11 +725,34 @@ function bindArchiveDropTargets(root) {
         target.addEventListener('drop', async (e) => {
             e.preventDefault();
             target.classList.remove('archive-folder-drop');
+            const itemId = Number(e.dataTransfer?.getData('application/x-archive-item-id') || 0);
+            const sourceFolder = normalizeArchiveBrowserPath(e.dataTransfer?.getData('application/x-archive-item-folder') || '');
+            if (itemId) {
+                if (sourceFolder === folder) return;
+                await moveArchiveItem(itemId, folder);
+                return;
+            }
             const file = e.dataTransfer?.files?.[0];
             if (!file) return;
             await uploadArchiveFile(file, folder);
         });
     });
+}
+
+async function moveArchiveItem(id, folder) {
+    try {
+        const res = await fetch('/api/archive/' + id + '/move', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: folder || 'Genel' })
+        });
+        const data = await res.json();
+        if (!res.ok) return showSnack(data.error || 'Dosya taşınamadı.', true);
+        showSnack('Dosya taşındı.');
+        loadArchive();
+    } catch {
+        showSnack('Dosya taşınamadı.', true);
+    }
 }
 
 function renderArchiveFolderPanel(rows) {
@@ -824,9 +860,10 @@ function renderArchiveGrid(images) {
         const typeText = mediaType === 'image' ? 'Görsel' : mediaType === 'video' ? 'Video' : 'Ses';
         const modified = new Date(img.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
         const clickable = mediaType === 'image' || mediaType === 'video';
+        const folderPath = normalizeArchiveBrowserPath(img.folder);
 
         return `
-        <div class="archive-row" data-id="${img.id}" data-path="${escHtml(img.path)}" data-type="${mediaType}">
+        <div class="archive-row" data-id="${img.id}" data-path="${escHtml(img.path)}" data-type="${mediaType}" data-item-folder="${escHtml(folderPath)}" draggable="true">
             <div class="archive-name-cell" ${clickable ? 'data-open-lightbox="1" style="cursor:pointer"' : ''}>
                 <div class="archive-thumb">${preview}</div>
                 <div class="archive-name-main">
@@ -836,7 +873,7 @@ function renderArchiveGrid(images) {
             </div>
             <div class="muted owner-col">ben</div>
             <div class="muted">${modified}</div>
-            <div class="muted">—</div>
+            <div class="muted">${formatArchiveSize(img.size_bytes)}</div>
             <div class="archive-actions">
                 <button class="archive-action-btn" data-rename-item="${img.id}" data-item-name="${escHtml(img.name)}" title="Dosya Adını Güncelle"><span class="material-symbols-rounded" style="font-size:18px">edit</span></button>
                 <button class="archive-action-btn" data-delete-item="${img.id}" title="Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>
@@ -855,6 +892,13 @@ function renderArchiveGrid(images) {
     });
     grid.querySelectorAll('[data-open-lightbox]').forEach(el => {
         el.addEventListener('click', (e) => openArchiveLightbox(e, el.closest('.archive-row')));
+    });
+    grid.querySelectorAll('.archive-row[data-id]').forEach(el => {
+        el.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('application/x-archive-item-id', String(el.dataset.id));
+            e.dataTransfer.setData('application/x-archive-item-folder', String(el.dataset.itemFolder || ''));
+            e.dataTransfer.effectAllowed = 'move';
+        });
     });
     grid.querySelectorAll('[data-rename-folder]').forEach(el => el.addEventListener('click', (e) => renameArchiveFolder(el.dataset.renameFolder, e)));
     grid.querySelectorAll('[data-delete-folder]').forEach(el => el.addEventListener('click', (e) => deleteArchiveFolder(el.dataset.deleteFolder, e)));
