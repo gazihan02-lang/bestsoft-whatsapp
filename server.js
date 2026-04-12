@@ -49,8 +49,6 @@ app.get('/dashboard', requireAuth, (req, res) => {
 // Socket.io: bağlanan her istemciye mevcut durumu ve QR'ı gönder
 io.on('connection', (socket) => {
     const botClient = require('./bot/client');
-
-    // ── Bot 1 ──
     const { status, info } = botClient.getBotStatus();
     socket.emit('bot:status', { status, message: info ? `Bağlandı: ${info.number}` : undefined });
     const qr = botClient.getLastQr();
@@ -61,29 +59,14 @@ io.on('connection', (socket) => {
     if (status === 'connected' && info) {
         socket.emit('bot:ready', { status: 'connected', ...info });
     }
+    // Önbellekteki grup sayısını ve listesini hemen gönder
     const gc = botClient.getGroupCount();
     if (gc !== null) socket.emit('bot:groups', { count: gc, list: botClient.getGroupList() });
-
-    // ── Bot 2 ──
-    const bot2 = botClient.getInstance('bot2');
-    const { status: s2, info: i2 } = bot2.getBotStatus();
-    socket.emit('bot2:status', { status: s2, message: i2 ? `Bağlandı: ${i2.number}` : undefined });
-    const qr2 = bot2.getLastQr();
-    if (qr2) {
-        socket.emit('bot2:qr', qr2);
-        socket.emit('bot2:status', { status: 'qr_pending', message: 'QR Kodu bekleniyor' });
-    }
-    if (s2 === 'connected' && i2) {
-        socket.emit('bot2:ready', { status: 'connected', ...i2 });
-    }
-    const gc2 = bot2.getGroupCount();
-    if (gc2 !== null) socket.emit('bot2:groups', { count: gc2, list: bot2.getGroupList() });
 });
 
-// WhatsApp botlarını başlat
+// WhatsApp botunu başlat
 const botClient = require('./bot/client');
 botClient.init(io);
-botClient.getInstance('bot2').init(io);
 
 httpServer.listen(PORT, () => {
     console.log(`\n🌐 Web arayüzü: http://localhost:${PORT}`);

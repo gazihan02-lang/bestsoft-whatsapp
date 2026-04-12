@@ -87,19 +87,6 @@ document.getElementById('waLogoutBtn').addEventListener('click', async () => {
     finally { btn.disabled = false; btn.style.opacity = ''; }
 });
 
-document.getElementById('waLogoutBtn2')?.addEventListener('click', async () => {
-    if (!confirm('Bot 2\'nin WhatsApp hesabından çıkmak istediğinizden emin misiniz?')) return;
-    const btn = document.getElementById('waLogoutBtn2');
-    btn.disabled = true; btn.style.opacity = '0.7';
-    try {
-        const res = await fetch('/api/bot2/wa-logout', { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) showSnack(data.error || 'Çıkış yapılamadı.', true);
-        else showSnack('Bot 2 WhatsApp oturumu kapatıldı.');
-    } catch { showSnack('Sunucu hatası.', true); }
-    finally { btn.disabled = false; btn.style.opacity = ''; }
-});
-
 // ─── Bot Status ──────────────────────────────
 function updateBotStatus({ status, message, name, number }) {
     const chip       = document.getElementById('statusChip');
@@ -181,51 +168,6 @@ socket.on('bot:message', () => {
     // mesaj alındığında log sayısını güncelle
     loadLogCount();
 });
-
-// ─── Bot 2 Status ─────────────────────────────
-function updateBotStatus2({ status, message, name, number }) {
-    const chip    = document.getElementById('statusChip2');
-    const qrSec   = document.getElementById('qrSection2');
-    const initSec = document.getElementById('initSection2');
-    const connSec = document.getElementById('connectedSection2');
-    const discSec = document.getElementById('disconnectedSection2');
-    if (!chip) return;
-
-    qrSec.hidden = initSec.hidden = connSec.hidden = discSec.hidden = true;
-
-    const configs = {
-        initializing: { chipClass: 'chip-status-initializing', icon: 'sync',         label: 'Başlatılıyor', show: 'init' },
-        qr_pending:   { chipClass: 'chip-status-qr',            icon: 'qr_code',      label: 'QR Bekleniyor', show: 'qr'   },
-        connected:    { chipClass: 'chip-status-connected',      icon: 'check_circle', label: 'Bağlandı',       show: 'conn' },
-        disconnected: { chipClass: 'chip-status-disconnected',   icon: 'wifi_off',     label: 'Bağlı Değil',   show: 'disc' },
-        error:        { chipClass: 'chip-status-error',          icon: 'error',        label: 'Hata',           show: 'disc' },
-    };
-
-    const cfg = configs[status] || configs.disconnected;
-    chip.className = `chip ${cfg.chipClass}`;
-    chip.innerHTML = `<span class="material-symbols-rounded" style="font-size:14px">${cfg.icon}</span> ${cfg.label}`;
-
-    if (cfg.show === 'init') initSec.hidden = false;
-    if (cfg.show === 'qr')   qrSec.hidden   = false;
-    if (cfg.show === 'conn') {
-        connSec.hidden = false;
-        if (name)   document.getElementById('connectedName2').textContent   = name;
-        if (number) document.getElementById('connectedNumber2').textContent = `+${number}`;
-    }
-    if (cfg.show === 'disc') {
-        discSec.hidden = false;
-        document.getElementById('disconnectedMsg2').textContent = message || 'Bot 2 bağlı değil.';
-    }
-}
-
-socket.on('bot2:status', ({ status, message }) => updateBotStatus2({ status, message }));
-socket.on('bot2:ready',  ({ status, name, number }) => updateBotStatus2({ status, name, number }));
-socket.on('bot2:qr',     (dataUrl) => { if (dataUrl) document.getElementById('qrImage2').src = dataUrl; });
-
-fetch('/api/bot2/status')
-    .then(r => r.json())
-    .then(data => updateBotStatus2(data))
-    .catch(() => {});
 
 socket.on('schedule:sent', () => {
     if (currentSection === 'schedule') loadScheduled();
