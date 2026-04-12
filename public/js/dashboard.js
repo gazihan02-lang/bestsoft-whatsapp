@@ -41,7 +41,8 @@ function navigate(section) {
     document.querySelectorAll('.section').forEach(s => {
         s.classList.toggle('active', s.id === `section-${section}`);
     });
-    document.getElementById('pageTitle').textContent = PAGE_TITLES[section] || section;
+    const pageTitleEl = document.getElementById('pageTitle');
+    if (pageTitleEl) pageTitleEl.textContent = PAGE_TITLES[section] || section;
 
     // Load data on navigate
     if (section === 'schedule') { loadScheduled(); loadGroupList(); loadArchivePicker(); }
@@ -1023,7 +1024,7 @@ function closeArchiveFolderModal() {
 }
 
 function syncArchiveFileAccept() {
-    archiveFileInput.accept = 'image/*,video/*,audio/*';
+    if (archiveFileInput) archiveFileInput.accept = 'image/*,video/*,audio/*';
 }
 
 document.querySelectorAll('.archive-type-btn').forEach(() => {});
@@ -1061,7 +1062,7 @@ async function uploadArchiveFile(file, folderName) {
     fd.append('file', file);
     fd.append('folder', normalizeArchiveBrowserPath(folderName) || 'Genel');
 
-    archiveUploadBtn.disabled = true;
+    if (archiveUploadBtn) archiveUploadBtn.disabled = true;
     let createdItem = null;
     try {
         const res = await fetch('/api/archive/upload', { method: 'POST', body: fd });
@@ -1088,7 +1089,7 @@ async function uploadArchiveFile(file, folderName) {
     } catch {
         showSnack('Yükleme başarısız.', true);
     } finally {
-        archiveUploadBtn.disabled = false;
+        if (archiveUploadBtn) archiveUploadBtn.disabled = false;
         loadArchive();
     }
 }
@@ -1104,9 +1105,9 @@ archiveFolderModalInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeArchiveFolderModal();
 });
 
-archiveUploadBtn.addEventListener('click', () => archiveFileInput.click());
+archiveUploadBtn?.addEventListener('click', () => archiveFileInput?.click());
 
-archiveFileInput.addEventListener('change', async () => {
+archiveFileInput?.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
 
