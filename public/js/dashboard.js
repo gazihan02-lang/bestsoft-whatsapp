@@ -802,23 +802,23 @@ function renderArchiveFolderPanel(rows) {
     renderArchiveBreadcrumb();
 }
 
-function loadArchive() {
-    const params = new URLSearchParams({ scope: 'current' });
-    if (currentArchivePath) params.set('folder', currentArchivePath);
-    if (archiveSearchText) params.set('q', archiveSearchText);
-
-    Promise.all([
-        fetch('/api/archive?' + params.toString()).then(r => r.json()),
-        fetch('/api/archive/folders').then(r => r.json())
-    ]).then(([items, folders]) => {
-        archiveImages = items;
-        archiveFolders = folders;
-        renderArchiveTypeButtons();
+async function loadArchive() {
+    try {
+        const qParam = archiveSearchText ? `&q=${encodeURIComponent(archiveSearchText)}` : '';
+        const folderParam = currentArchivePath ? `&folder=${encodeURIComponent(currentArchivePath)}` : '';
+        const [imgRes, folderRes] = await Promise.all([
+            fetch(`/api/archive?scope=current${folderParam}${qParam}`),
+            fetch('/api/archive/folders')
+        ]);
+        const imgData   = await imgRes.json();
+        const folderData = await folderRes.json();
+        const images  = Array.isArray(imgData.data)   ? imgData.data   : [];
+        const folders = Array.isArray(folderData.data) ? folderData.data : [];
         renderArchiveFolderPanel(folders);
-        renderArchiveGrid(items);
-    }).catch(() => showSnack('Arşiv yüklenemedi.', true));
-
-    loadArchivePicker();
+        renderArchiveGrid(images);
+    } catch (err) {
+        console.error('loadArchive error:', err);
+    }
 }
 
 function renderArchiveGrid(images) {
