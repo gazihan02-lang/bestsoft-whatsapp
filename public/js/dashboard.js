@@ -130,11 +130,7 @@ function updateBotStatus({ status, message, name, number }) {
     chip.className = `chip ${cfg.chipClass}`;
     chip.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px">${cfg.icon}</span> ${cfg.label}`;
 
-    // Sync header chip
-    const headerChip = document.getElementById('statusChipHeader');
-    if (headerChip) {
-        headerChip.innerHTML = `<div class="chip ${cfg.chipClass}"><span class="material-symbols-rounded" style="font-size:14px">${cfg.icon}</span> ${cfg.label}</div>`;
-    }
+    // (statusChipHeader removed — chip is now in the top nav bar directly)
 
     if (cfg.show === 'init') initSec.hidden = false;
     if (cfg.show === 'qr')   qrSec.hidden   = false;

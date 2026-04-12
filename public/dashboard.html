@@ -114,9 +114,10 @@
     .td-truncate { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; color:#374151; }
 
     /* ── Nav active states ──────────────────────── */
-    .nav-item.active .nav-pill { background:#eef2ff; }
     .nav-item.active .nav-icon { color:#4f46e5; }
-    .nav-item.active .nav-label { color:#3730a3; font-weight:600; }
+    .nav-item.active .nav-label { color:#4f46e5; font-weight:600; }
+    .nav-item.active { border-bottom:2px solid #4f46e5; }
+    .nav-item { border-bottom:2px solid transparent; }
     .mobile-nav-btn.active .mob-icon { color:#4f46e5; }
     .mobile-nav-btn.active .mob-label { color:#4f46e5; font-weight:500; }
 
@@ -151,101 +152,61 @@
 <body class="bg-slate-50 text-gray-900 antialiased">
 
   <!-- ═══════════════════════════════════════════════
-       DESKTOP SIDEBAR
+       TOP NAV BAR (horizontal)
   ═══════════════════════════════════════════════ -->
-  <aside class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-56 bg-white border-r border-gray-100 z-30">
+  <header class="fixed top-0 left-0 right-0 bg-white border-b border-gray-100 z-30 flex items-center gap-4 px-5 h-14">
     <!-- Logo -->
-    <div class="flex items-center gap-3 px-5 h-16 border-b border-gray-100">
-      <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center">
         <span class="material-symbols-rounded text-white" style="font-size:18px">smart_toy</span>
       </div>
-      <span class="font-bold text-lg text-gray-900 tracking-tight">BestApp</span>
+      <span class="font-bold text-base text-gray-900 tracking-tight hidden sm:block">BestApp</span>
     </div>
 
-    <!-- Nav items -->
-    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-      <button class="nav-item active flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="home">
-        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
-          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">home</span>
-        </div>
-        <span class="nav-label text-sm text-gray-600">Ana Sayfa</span>
+    <!-- Horizontal nav items -->
+    <nav class="hidden lg:flex items-end h-full gap-1">
+      <button class="nav-item active flex items-center gap-1.5 px-3 h-full text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors" data-section="home">
+        <span class="nav-icon material-symbols-rounded" style="font-size:18px">home</span>
+        <span class="nav-label">Ana Sayfa</span>
       </button>
-      <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="schedule">
-        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
-          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">schedule</span>
-        </div>
-        <span class="nav-label text-sm text-gray-600">Zamanlama</span>
+      <button class="nav-item flex items-center gap-1.5 px-3 h-full text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors" data-section="schedule">
+        <span class="nav-icon material-symbols-rounded" style="font-size:18px">schedule</span>
+        <span class="nav-label">Zamanlama</span>
       </button>
-      <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="archives">
-        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
-          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">folder_open</span>
-        </div>
-        <span class="nav-label text-sm text-gray-600">Arşivler</span>
+      <button class="nav-item flex items-center gap-1.5 px-3 h-full text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors" data-section="archives">
+        <span class="nav-icon material-symbols-rounded" style="font-size:18px">folder_open</span>
+        <span class="nav-label">Arşivler</span>
       </button>
-      <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="logs">
-        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
-          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">history</span>
-        </div>
-        <span class="nav-label text-sm text-gray-600">Günlük</span>
+      <button class="nav-item flex items-center gap-1.5 px-3 h-full text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors" data-section="logs">
+        <span class="nav-icon material-symbols-rounded" style="font-size:18px">history</span>
+        <span class="nav-label">Günlük</span>
       </button>
-      <button class="nav-item flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left transition-colors" data-section="settings">
-        <div class="nav-pill w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
-          <span class="nav-icon material-symbols-rounded text-gray-500" style="font-size:20px">settings</span>
-        </div>
-        <span class="nav-label text-sm text-gray-600">Ayarlar</span>
+      <button class="nav-item flex items-center gap-1.5 px-3 h-full text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors" data-section="settings">
+        <span class="nav-icon material-symbols-rounded" style="font-size:18px">settings</span>
+        <span class="nav-label">Ayarlar</span>
       </button>
     </nav>
 
-    <!-- Footer: bot status + logout -->
-    <div class="px-3 pb-4 border-t border-gray-100 pt-3 flex flex-col gap-2">
-      <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50">
-        <span class="material-symbols-rounded text-gray-400" style="font-size:16px">smart_toy</span>
-        <div id="statusChip" class="chip chip-status-initializing">
-          <span class="material-symbols-rounded" style="font-size:14px">sync</span>
-          Başlatılıyor
-        </div>
-      </div>
-      <button id="logoutBtn" class="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-left hover:bg-red-50 transition-colors group">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span class="material-symbols-rounded text-gray-400 group-hover:text-red-500 transition-colors" style="font-size:20px">logout</span>
-        </div>
-        <span class="text-sm text-gray-600 group-hover:text-red-500 transition-colors">Çıkış Yap</span>
-      </button>
+    <!-- Spacer -->
+    <div class="flex-1"></div>
+
+    <!-- Bot status + avatar + logout -->
+    <div id="statusChip" class="chip chip-status-initializing">
+      <span class="material-symbols-rounded" style="font-size:14px">sync</span>
+      <span id="statusChipLabel">Başlatılıyor</span>
     </div>
-  </aside>
+    <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm flex-shrink-0" id="topBarAvatar">A</div>
+    <span id="topBarUsername" class="hidden md:block text-sm text-gray-600"></span>
+    <button id="logoutBtn" class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors">
+      <span class="material-symbols-rounded" style="font-size:20px">logout</span>
+    </button>
+  </header>
 
 
   <!-- ═══════════════════════════════════════════════
        MAIN AREA
   ═══════════════════════════════════════════════ -->
-  <div class="lg:ml-56 flex flex-col min-h-screen">
-
-    <!-- TOP BAR -->
-    <header class="sticky top-0 bg-white border-b border-gray-100 z-20 flex items-center gap-3 px-4 h-14">
-      <!-- Mobile menu button -->
-      <button id="mobileMenuBtn" class="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
-        <span class="material-symbols-rounded" style="font-size:22px">menu</span>
-      </button>
-
-      <h1 id="pageTitle" class="flex-1 font-semibold text-gray-900 text-base">Ana Sayfa</h1>
-
-      <!-- Bot status chip (mobile + desktop) -->
-      <div id="statusChipHeader" class="hidden sm:flex">
-        <div class="chip chip-status-initializing">
-          <span class="material-symbols-rounded" style="font-size:14px">sync</span>
-          <span class="hidden xs:inline">Başlatılıyor</span>
-        </div>
-      </div>
-
-      <!-- Avatar -->
-      <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm flex-shrink-0" id="topBarAvatar">A</div>
-      <span id="topBarUsername" class="hidden md:block text-sm text-gray-600"></span>
-
-      <!-- Mobile logout -->
-      <button id="logoutBtnMobile" class="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-        <span class="material-symbols-rounded" style="font-size:20px">logout</span>
-      </button>
-    </header>
+  <div class="flex flex-col min-h-screen pt-14">
 
     <!-- SCROLLABLE CONTENT -->
     <main class="main-scroll flex-1 p-4 lg:p-6">
@@ -817,26 +778,10 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
-    // ── Mobile logout buttons wired up here (before dashboard.js loads)
-    // dashboard.js handles #logoutBtn - wire the other two to click it
+    // ── Mobile logout button
     document.addEventListener('DOMContentLoaded', () => {
       const main = document.getElementById('logoutBtn');
-      document.getElementById('logoutBtnMobile')?.addEventListener('click', () => main?.click());
       document.getElementById('logoutBtnMob')?.addEventListener('click', () => main?.click());
-
-      // Mobile menu toggle (not needed since we use bottom nav, but keep for completeness)
-      document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {});
-
-      // Sync statusChipHeader with statusChip content via MutationObserver
-      const chip = document.getElementById('statusChip');
-      const header = document.getElementById('statusChipHeader');
-      if (chip && header) {
-        const sync = () => {
-          header.innerHTML = chip.outerHTML.replace('id="statusChip"', 'id="statusChipHeader"');
-        };
-        sync();
-        new MutationObserver(sync).observe(chip, { subtree: true, childList: true, characterData: true, attributes: true });
-      }
     });
   </script>
 
