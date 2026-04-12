@@ -616,113 +616,204 @@ document.getElementById('refreshScheduleBtn').addEventListener('click', loadSche
 
 /* ======= Resim Arşivi Yönetimi ======= */
 let archiveImages = [];
+let archiveFolders = [];
+let currentArchivePath = '';
 
-function renderArchiveTypeButtons() {
-    // Tek arşiv ekranı kullanılıyor.
+function normalizeArchiveBrowserPath(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Genel' || raw === '__root__' || raw === '__all__') return '';
+    return raw;
 }
 
-function renderArchiveFolderPanel(rows) {
-    const panel = document.getElementById('archiveFolderListPanel');
-    const folders = rows.map(r => normalizeFolderName(r.folder));
+function getArchivePathSegments(pathValue = '') {
+    return normalizeArchiveBrowserPath(pathValue).split('/').filter(Boolean);
+}
 
-    if (!folders.includes(selectedArchiveManageFolder)) selectedArchiveManageFolder = '__all__';
+function getArchivePathName(pathValue = '') {
+    const parts = getArchivePathSegments(pathValue);
+    return parts.length ? parts[parts.length - 1] : 'Ana Arşiv';
+}
 
-    const allRow = `
-      <div class="archive-folder-row ${selectedArchiveManageFolder === '__all__' ? 'active' : ''}" data-folder="__all__">
-        <button class="archive-folder-btn" data-folder="__all__">
-          <span class="material-symbols-rounded" style="font-size:18px">folder_open</span>
-          <span class="truncate">Tüm Klasörler</span>
-        </button>
-      </div>`;
+function getArchivePathParent(pathValue = '') {
+    const parts = getArchivePathSegments(pathValue);
+    parts.pop();
+    return parts.join('/');
+}
 
-    const folderRows = folders.map(f => {
-        const isActive = selectedArchiveManageFolder === f;
-        const canDelete = f !== 'Genel';
-        return `
-        <div class="archive-folder-row ${isActive ? 'active' : ''}" data-folder="${escHtml(f)}">
-          <button class="archive-folder-btn" data-folder="${escHtml(f)}">
-            <span class="material-symbols-rounded" style="font-size:18px">folder</span>
-            <span class="truncate">${escHtml(f)}</span>
-          </button>
-          ${canDelete ? `<button class="archive-folder-delete" data-delete-folder="${escHtml(f)}" title="Klasörü Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>` : ''}
-        </div>`;
-    }).join('');
+function getDirectChildFolders(rows, parentPath, query = '') {
+    const parent = normalizeArchiveBrowserPath(parentPath);
+    const search = String(query || '').trim().toLowerCase();
+    const exactCounts = new Map();
+    const allPaths = rows
+        .map(row => normalizeArchiveBrowserPath(row.folder))
+        .filter(Boolean);
 
-    panel.innerHTML = allRow + folderRows;
+    rows.forEach(row => {
+        const pathValue = normalizeArchiveBrowserPath(row.folder);
+        if (pathValue) exactCounts.set(pathValue, row.count || 0);
+    });
 
-    panel.querySelectorAll('button[data-folder]').forEach(btn => {
+    const directChildren = new Map();
+    allPaths.forEach(fullPath => {
+        let childPath = '';
+        if (!parent) {
+            childPath = fullPath.split('/')[0];
+        } else if (fullPath.startsWith(parent + '/')) {
+            const remainder = fullPath.slice(parent.length + 1);
+            childPath = parent + '/' + remainder.split('/')[0];
+        }
+
+        if (!childPath || childPath === parent) return;
+        if (search && !childPath.toLowerCase().includes(search) && !getArchivePathName(childPath).toLowerCase().includes(search)) return;
+
+        if (!directChildren.has(childPath)) {
+            directChildren.set(childPath, {
+                path: childPath,
+                name: getArchivePathName(childPath),
+                count: exactCounts.get(childPath) || 0,
+                hasChildren: allPaths.some(pathValue => pathValue !== childPath && pathValue.startsWith(childPath + '/'))
+            });
+        }
+    });
+
+    return [...directChildren.values()].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+}
+
+function renderArchiveBreadcrumb() {
+    const breadcrumb = document.getElementById('archiveBreadcrumb');
+    const label = document.getElementById('archiveCurrentLabel');
+    const segments = getArchivePathSegments(currentArchivePath);
+    const crumbs = ['<button type="button" data-breadcrumb-path="">Arşiv</button>'];
+    let builtPath = '';
+
+    segments.forEach(segment => {
+        builtPath = builtPath ? builtPath + '/' + segment : segment;
+        crumbs.push(`<span class="sep">/</span><button type="button" data-breadcrumb-path="${escHtml(builtPath)}">${escHtml(segment)}</button>`);
+    });
+
+    breadcrumb.innerHTML = crumbs.join('');
+    label.textContent = currentArchivePath || 'Ana arşiv';
+    breadcrumb.querySelectorAll('[data-breadcrumb-path]').forEach(btn => {
         btn.addEventListener('click', () => {
-            selectedArchiveManageFolder = btn.dataset.folder;
+            currentArchivePath = normalizeArchiveBrowserPath(btn.dataset.breadcrumbPath);
             loadArchive();
         });
     });
+}
 
-    panel.querySelectorAll('button[data-delete-folder]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const folder = btn.dataset.deleteFolder;
-            if (!confirm(`"${folder}" klasörünü silmek istiyor musunuz? Dosyalar Genel klasörüne taşınır.`)) return;
-            try {
-                const res = await fetch(`/api/archive/folders?name=${encodeURIComponent(folder)}`, { method: 'DELETE' });
-                const data = await res.json();
-                if (!res.ok) { showSnack(data.error || 'Klasör silinemedi.', true); return; }
-                if (selectedArchiveManageFolder === folder) selectedArchiveManageFolder = '__all__';
-                loadArchive();
-                showSnack('Klasör silindi.');
-            } catch {
-                showSnack('Klasör silinemedi.', true);
-            }
-        });
-    });
-
-    panel.querySelectorAll('.archive-folder-row').forEach(row => {
-        const folder = row.dataset.folder;
-        row.addEventListener('dragover', (e) => {
-            if (folder === '__all__') return;
+function bindArchiveDropTargets(root) {
+    root.querySelectorAll('[data-folder-row], [data-drop-folder]').forEach(target => {
+        const folder = normalizeArchiveBrowserPath(target.dataset.folderRow || target.dataset.dropFolder);
+        target.addEventListener('dragover', (e) => {
             e.preventDefault();
-            row.classList.add('archive-folder-drop');
+            target.classList.add('archive-folder-drop');
         });
-        row.addEventListener('dragleave', () => row.classList.remove('archive-folder-drop'));
-        row.addEventListener('drop', async (e) => {
-            row.classList.remove('archive-folder-drop');
-            if (folder === '__all__') return;
+        target.addEventListener('dragleave', () => target.classList.remove('archive-folder-drop'));
+        target.addEventListener('drop', async (e) => {
             e.preventDefault();
+            target.classList.remove('archive-folder-drop');
             const file = e.dataTransfer?.files?.[0];
             if (!file) return;
             await uploadArchiveFile(file, folder);
         });
     });
+}
 
-    document.getElementById('archiveFolderList').innerHTML = folders.map(f => `<option value="${escHtml(f)}"></option>`).join('');
+function renderArchiveFolderPanel(rows) {
+    archiveFolders = rows;
+    const panel = document.getElementById('archiveFolderListPanel');
+    const treeRows = [];
+
+    function walk(parentPath = '', depth = 0) {
+        const children = getDirectChildFolders(rows, parentPath);
+        children.forEach(folder => {
+            const isActive = currentArchivePath === folder.path;
+            treeRows.push(`
+                <div class="archive-folder-row ${isActive ? 'active' : ''}" data-folder-row="${escHtml(folder.path)}">
+                  <button class="archive-folder-btn" data-open-folder="${escHtml(folder.path)}" style="padding-left:${8 + depth * 14}px">
+                    <span class="material-symbols-rounded" style="font-size:18px">folder</span>
+                    <span class="folder-label">${escHtml(folder.name)}</span>
+                  </button>
+                  <div class="archive-folder-actions">
+                    <button class="archive-folder-rename" data-rename-folder="${escHtml(folder.path)}" title="Klasörü Yeniden Adlandır"><span class="material-symbols-rounded" style="font-size:18px">edit</span></button>
+                    <button class="archive-folder-delete" data-delete-folder="${escHtml(folder.path)}" title="Klasörü Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>
+                  </div>
+                </div>`);
+            walk(folder.path, depth + 1);
+        });
+    }
+
+    walk();
+    panel.innerHTML = `
+        <div class="archive-folder-row ${currentArchivePath === '' ? 'active' : ''}" data-folder-row="">
+          <button class="archive-folder-btn" data-open-folder="">
+            <span class="material-symbols-rounded" style="font-size:18px">home_storage</span>
+            <span class="folder-label">Ana Arşiv</span>
+          </button>
+        </div>` + treeRows.join('');
+
+    panel.querySelectorAll('[data-open-folder]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentArchivePath = normalizeArchiveBrowserPath(btn.dataset.openFolder);
+            loadArchive();
+        });
+    });
+    panel.querySelectorAll('[data-rename-folder]').forEach(btn => btn.addEventListener('click', (e) => renameArchiveFolder(btn.dataset.renameFolder, e)));
+    panel.querySelectorAll('[data-delete-folder]').forEach(btn => btn.addEventListener('click', (e) => deleteArchiveFolder(btn.dataset.deleteFolder, e)));
+    bindArchiveDropTargets(panel);
+
+    document.getElementById('archiveFolderList').innerHTML = rows.map(f => `<option value="${escHtml(f.folder)}"></option>`).join('');
+    renderArchiveBreadcrumb();
 }
 
 function loadArchive() {
-    const folderParam = selectedArchiveManageFolder !== '__all__' ? `&folder=${encodeURIComponent(selectedArchiveManageFolder)}` : '';
-    const searchParam = archiveSearchText ? `&q=${encodeURIComponent(archiveSearchText)}` : '';
+    const params = new URLSearchParams({ scope: 'current' });
+    if (currentArchivePath) params.set('folder', currentArchivePath);
+    if (archiveSearchText) params.set('q', archiveSearchText);
 
     Promise.all([
-        fetch(`/api/archive?${[folderParam.replace('&',''), searchParam.replace('&','')].filter(Boolean).join('&')}`).then(r => r.json()),
+        fetch('/api/archive?' + params.toString()).then(r => r.json()),
         fetch('/api/archive/folders').then(r => r.json())
     ]).then(([items, folders]) => {
         archiveImages = items;
+        archiveFolders = folders;
         renderArchiveTypeButtons();
         renderArchiveFolderPanel(folders);
         renderArchiveGrid(items);
-    }).catch(() => {});
+    }).catch(() => showSnack('Arşiv yüklenemedi.', true));
 
-    // Schedule ekranındaki arşiv seçici her zaman görselleri kullanır.
     loadArchivePicker();
 }
 
 function renderArchiveGrid(images) {
     const grid = document.getElementById('archiveGrid');
-    if (!images.length) {
+    const childFolders = getDirectChildFolders(archiveFolders, currentArchivePath, archiveSearchText);
+
+    if (!childFolders.length && !images.length) {
         grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <span class="material-symbols-rounded">folder_open</span>Bu klasörde dosya yok</div>`;
+            <span class="material-symbols-rounded">folder_open</span>Bu klasörde içerik yok</div>`;
         return;
     }
 
-    grid.innerHTML = images.map(img => {
+    const folderRows = childFolders.map(folder => `
+        <div class="archive-row folder-entry" data-drop-folder="${escHtml(folder.path)}">
+            <div class="archive-name-cell" data-open-folder="${escHtml(folder.path)}" style="cursor:pointer">
+                <div class="archive-thumb"><span class="material-symbols-rounded text-amber-500">folder</span></div>
+                <div class="archive-name-main">
+                    <div class="title">${escHtml(folder.name)}</div>
+                    <div class="sub">${escHtml(folder.path)}${folder.hasChildren ? ' • alt klasörler var' : ''}</div>
+                </div>
+            </div>
+            <div class="muted owner-col">—</div>
+            <div class="muted">Klasör</div>
+            <div class="muted">${folder.count} dosya</div>
+            <div class="archive-actions">
+                <button class="archive-action-btn" data-rename-folder="${escHtml(folder.path)}" title="Klasörü Yeniden Adlandır"><span class="material-symbols-rounded" style="font-size:18px">edit</span></button>
+                <button class="archive-action-btn" data-delete-folder="${escHtml(folder.path)}" title="Klasörü Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>
+            </div>
+        </div>`).join('');
+
+    const fileRows = images.map(img => {
         const mediaType = img.media_type || 'image';
         const preview = mediaType === 'image'
             ? `<img src="${escHtml(img.path)}" alt="${escHtml(img.name)}" loading="lazy">`
@@ -732,24 +823,44 @@ function renderArchiveGrid(images) {
         const icon = mediaType === 'image' ? 'image' : mediaType === 'video' ? 'movie' : 'mic';
         const typeText = mediaType === 'image' ? 'Görsel' : mediaType === 'video' ? 'Video' : 'Ses';
         const modified = new Date(img.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+        const clickable = mediaType === 'image' || mediaType === 'video';
 
         return `
         <div class="archive-row" data-id="${img.id}" data-path="${escHtml(img.path)}" data-type="${mediaType}">
-            <div class="archive-name-cell" style="cursor:pointer" onclick="openArchiveLightbox(event,this.closest('.archive-row'))">
+            <div class="archive-name-cell" ${clickable ? 'data-open-lightbox="1" style="cursor:pointer"' : ''}>
                 <div class="archive-thumb">${preview}</div>
                 <div class="archive-name-main">
                     <div class="title">${escHtml(img.name)}</div>
-                    <div class="sub"><span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">${icon}</span> ${typeText} • ${escHtml(normalizeFolderName(img.folder))}</div>
+                    <div class="sub"><span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">${icon}</span> ${typeText} • ${escHtml(currentArchivePath || 'Ana arşiv')}</div>
                 </div>
             </div>
             <div class="muted owner-col">ben</div>
             <div class="muted">${modified}</div>
             <div class="muted">—</div>
-            <button class="archive-delete-btn" onclick="deleteArchiveImg(${img.id}, event)" title="Sil">
-              <span class="material-symbols-rounded" style="font-size:18px">delete</span>
-            </button>
+            <div class="archive-actions">
+                <button class="archive-action-btn" data-rename-item="${img.id}" data-item-name="${escHtml(img.name)}" title="Dosya Adını Güncelle"><span class="material-symbols-rounded" style="font-size:18px">edit</span></button>
+                <button class="archive-action-btn" data-delete-item="${img.id}" title="Sil"><span class="material-symbols-rounded" style="font-size:18px">delete</span></button>
+            </div>
         </div>`;
     }).join('');
+
+    grid.innerHTML = folderRows + fileRows;
+
+    grid.querySelectorAll('[data-open-folder]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentArchivePath = normalizeArchiveBrowserPath(el.dataset.openFolder);
+            loadArchive();
+        });
+    });
+    grid.querySelectorAll('[data-open-lightbox]').forEach(el => {
+        el.addEventListener('click', (e) => openArchiveLightbox(e, el.closest('.archive-row')));
+    });
+    grid.querySelectorAll('[data-rename-folder]').forEach(el => el.addEventListener('click', (e) => renameArchiveFolder(el.dataset.renameFolder, e)));
+    grid.querySelectorAll('[data-delete-folder]').forEach(el => el.addEventListener('click', (e) => deleteArchiveFolder(el.dataset.deleteFolder, e)));
+    grid.querySelectorAll('[data-rename-item]').forEach(el => el.addEventListener('click', (e) => renameArchiveItem(Number(el.dataset.renameItem), el.dataset.itemName, e)));
+    grid.querySelectorAll('[data-delete-item]').forEach(el => el.addEventListener('click', (e) => deleteArchiveImg(Number(el.dataset.deleteItem), e)));
+    bindArchiveDropTargets(grid);
 }
 
 window.openArchiveLightbox = function(e, row) {
@@ -782,10 +893,70 @@ window.openArchiveLightbox = function(e, row) {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lb.classList.contains('hidden')) closeLb(); });
 })();
 
+async function renameArchiveFolder(folderPath, e) {
+    e?.stopPropagation();
+    const currentName = getArchivePathName(folderPath);
+    const nextName = String(window.prompt('Yeni klasör adı:', currentName) || '').trim();
+    if (!nextName || nextName === currentName) return;
+    try {
+        const res = await fetch('/api/archive/folders', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: folderPath, name: nextName })
+        });
+        const data = await res.json();
+        if (!res.ok) return showSnack(data.error || 'Klasör güncellenemedi.', true);
+        if (currentArchivePath === folderPath || currentArchivePath.startsWith(folderPath + '/')) {
+            currentArchivePath = data.data.folder + currentArchivePath.slice(folderPath.length);
+        }
+        loadArchive();
+        showSnack('Klasör adı güncellendi.');
+    } catch {
+        showSnack('Klasör güncellenemedi.', true);
+    }
+}
+
+async function deleteArchiveFolder(folderPath, e) {
+    e?.stopPropagation();
+    const label = getArchivePathName(folderPath);
+    if (!confirm('"' + label + '" klasörü ve içindeki tüm alt klasör/dosyalar silinsin mi?')) return;
+    try {
+        const res = await fetch('/api/archive/folders?name=' + encodeURIComponent(folderPath), { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) return showSnack(data.error || 'Klasör silinemedi.', true);
+        if (currentArchivePath === folderPath || currentArchivePath.startsWith(folderPath + '/')) {
+            currentArchivePath = getArchivePathParent(folderPath);
+        }
+        loadArchive();
+        showSnack('Klasör silindi.');
+    } catch {
+        showSnack('Klasör silinemedi.', true);
+    }
+}
+
+async function renameArchiveItem(id, currentName, e) {
+    e?.stopPropagation();
+    const nextName = String(window.prompt('Yeni dosya adı:', currentName) || '').trim();
+    if (!nextName || nextName === currentName) return;
+    try {
+        const res = await fetch('/api/archive/' + id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: nextName })
+        });
+        const data = await res.json();
+        if (!res.ok) return showSnack(data.error || 'Dosya adı güncellenemedi.', true);
+        loadArchive();
+        showSnack('Dosya adı güncellendi.');
+    } catch {
+        showSnack('Dosya adı güncellenemedi.', true);
+    }
+}
+
 window.deleteArchiveImg = async (id, e) => {
     e.stopPropagation();
     if (!confirm('Bu dosyayı arşivden silmek istiyor musunuz?')) return;
-    const res = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
+    const res = await fetch('/api/archive/' + id, { method: 'DELETE' });
     if (res.ok) { loadArchive(); showSnack('Dosya arşivden silindi.'); }
     else showSnack('Silinemedi.', true);
 };
@@ -829,14 +1000,13 @@ async function createArchiveFolderFromModal() {
         const res = await fetch('/api/archive/folders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: value, mediaType: 'all' })
+            body: JSON.stringify({ name: value, parent: currentArchivePath, mediaType: 'all' })
         });
         const data = await res.json();
         if (!res.ok) { showSnack(data.error || 'Klasör oluşturulamadı.', true); return; }
-        selectedArchiveManageFolder = value;
         loadArchive();
         closeArchiveFolderModal();
-        showSnack(`Klasör oluşturuldu: ${value}`);
+        showSnack('Klasör oluşturuldu: ' + data.data.folder);
     } catch {
         showSnack('Klasör oluşturulamadı.', true);
     }
@@ -845,7 +1015,7 @@ async function createArchiveFolderFromModal() {
 async function uploadArchiveFile(file, folderName) {
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('folder', normalizeFolderName(folderName));
+    fd.append('folder', normalizeArchiveBrowserPath(folderName) || 'Genel');
 
     archiveUploadBtn.disabled = true;
     let createdItem = null;
@@ -860,7 +1030,7 @@ async function uploadArchiveFile(file, folderName) {
         const enteredName = window.prompt('Yükleme tamamlandı. Dosya adı girin:', suggestedName);
         const customName = String(enteredName || '').trim();
         if (customName && createdItem?.id) {
-            const renameRes = await fetch(`/api/archive/${createdItem.id}`, {
+            const renameRes = await fetch('/api/archive/' + createdItem.id, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: customName })
@@ -896,12 +1066,11 @@ archiveFileInput.addEventListener('change', async () => {
     const file = archiveFileInput.files[0];
     if (!file) return;
 
-    await uploadArchiveFile(file, selectedArchiveManageFolder !== '__all__' ? selectedArchiveManageFolder : 'Genel');
+    await uploadArchiveFile(file, currentArchivePath);
     archiveFileInput.value = '';
 });
 
 syncArchiveFileAccept();
-
 
 
 // ─── Settings ────────────────────────────────

@@ -38,6 +38,46 @@ function archiveTypeFromMime(mime = '') {
     return 'other';
 }
 
+function sanitizeArchiveSegment(value = '') {
+    return String(value)
+        .replace(/[<>:"\\|?*\x00-\x1F]/g, '')
+        .replace(/\//g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 60);
+}
+
+function normalizeArchivePath(value = '', fallback = 'Genel') {
+    const parts = String(value || '')
+        .split('/')
+        .map(sanitizeArchiveSegment)
+        .filter(Boolean);
+    return parts.length ? parts.join('/') : fallback;
+}
+
+function getArchiveParent(pathValue = '') {
+    const normalized = normalizeArchivePath(pathValue, '');
+    if (!normalized) return '';
+    const parts = normalized.split('/');
+    parts.pop();
+    return parts.join('/');
+}
+
+function renameArchivePath(oldPath, nextPath) {
+    const folderRows = db.prepare("SELECT id, name FROM archive_folders WHERE name = ? OR name LIKE ? ORDER BY LENGTH(name) ASC").all(oldPath, oldPath + '/%');
+    const archiveRows = db.prepare("SELECT id, folder FROM image_archive WHERE COALESCE(folder, 'Genel') = ? OR COALESCE(folder, 'Genel') LIKE ? ORDER BY id ASC").all(oldPath, oldPath + '/%');
+
+    for (const row of folderRows) {
+        const renamed = nextPath + row.name.slice(oldPath.length);
+        db.prepare('UPDATE archive_folders SET name = ? WHERE id = ?').run(renamed, row.id);
+    }
+
+    for (const row of archiveRows) {
+        const renamed = nextPath + String(row.folder || 'Genel').slice(oldPath.length);
+        db.prepare('UPDATE image_archive SET folder = ? WHERE id = ?').run(renamed, row.id);
+    }
+}
+
 module.exports = function (io) {
     const router = express.Router();
     const botClient = require('../bot/client');
@@ -149,6 +189,7 @@ module.exports = function (io) {
         const type = String(req.query.type || '').trim();
         const q = String(req.query.q || '').trim().toLowerCase();
         const folder = String(req.query.folder || '').trim();
+        const scope = String(req.query.scope || '').trim();
 
         let sql = "SELECT id, name, path, COALESCE(folder, 'Genel') AS folder, COALESCE(media_type, 'image') AS media_type, created_at FROM image_archive WHERE 1=1";
         const params = [];
@@ -157,16 +198,26 @@ module.exports = function (io) {
             sql += " AND COALESCE(media_type, 'image') = ?";
             params.push(type);
         }
-        if (folder && folder !== '__all__') {
+
+        if (scope === 'current') {
+            const normalizedFolder = normalizeArchivePath(folder, '');
+            if (normalizedFolder) {
+                sql += " AND COALESCE(folder, 'Genel') = ?";
+                params.push(normalizedFolder);
+            } else {
+                sql += " AND COALESCE(folder, 'Genel') = 'Genel'";
+            }
+        } else if (folder && folder !== '__all__') {
             sql += " AND COALESCE(folder, 'Genel') = ?";
-            params.push(folder);
-        }
-        if (q) {
-            sql += " AND (LOWER(name) LIKE ? OR LOWER(COALESCE(folder, 'Genel')) LIKE ?)";
-            params.push(`%${q}%`, `%${q}%`);
+            params.push(normalizeArchivePath(folder));
         }
 
-        sql += ' ORDER BY folder ASC, created_at DESC';
+        if (q) {
+            sql += " AND (LOWER(name) LIKE ? OR LOWER(COALESCE(folder, 'Genel')) LIKE ?)";
+            params.push('%' + q + '%', '%' + q + '%');
+        }
+
+        sql += ' ORDER BY created_at DESC';
         const rows = db.prepare(sql).all(...params);
         res.json(rows);
     });
@@ -189,7 +240,7 @@ module.exports = function (io) {
 
         const byFolder = new Map();
         [...createdFolders, ...rows].forEach(r => {
-            const key = String(r.folder || 'Genel');
+            const key = normalizeArchivePath(String(r.folder || 'Genel'));
             const prev = byFolder.get(key);
             byFolder.set(key, { folder: key, count: (prev?.count || 0) + (r.count || 0) });
         });
@@ -199,25 +250,51 @@ module.exports = function (io) {
 
     // ── Arşiv klasörü oluştur ────────────────────────────────────
     router.post('/archive/folders', (req, res) => {
-        const name = String(req.body.name || '').trim().substring(0, 60);
+        const name = sanitizeArchiveSegment(req.body.name || '');
+        const parent = normalizeArchivePath(req.body.parent || '', '');
         const mediaType = String(req.body.mediaType || 'all').trim() || 'all';
         if (!name) return res.status(400).json({ error: 'Klasör adı zorunlu.' });
         if (!['image', 'video', 'audio', 'all'].includes(mediaType)) return res.status(400).json({ error: 'Geçersiz arşiv türü.' });
 
-        db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(name, mediaType);
-        res.json({ success: true });
+        const fullPath = parent ? parent + '/' + name : name;
+        if (fullPath === 'Genel') return res.status(400).json({ error: 'Bu klasör adı kullanılamaz.' });
+
+        db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(fullPath, mediaType);
+        res.json({ success: true, data: { folder: fullPath } });
+    });
+
+    // ── Arşiv klasörü yeniden adlandır ──────────────────────────
+    router.patch('/archive/folders', (req, res) => {
+        const currentPath = normalizeArchivePath(req.body.path || '', '');
+        const newName = sanitizeArchiveSegment(req.body.name || '');
+        if (!currentPath) return res.status(400).json({ error: 'Klasör yolu gerekli.' });
+        if (!newName) return res.status(400).json({ error: 'Yeni klasör adı gerekli.' });
+
+        const parentPath = getArchiveParent(currentPath);
+        const nextPath = parentPath ? parentPath + '/' + newName : newName;
+        if (nextPath === currentPath) return res.json({ success: true, data: { folder: currentPath } });
+
+        const conflictFolder = db.prepare('SELECT id FROM archive_folders WHERE name = ?').get(nextPath);
+        const conflictArchive = db.prepare("SELECT id FROM image_archive WHERE COALESCE(folder, 'Genel') = ? LIMIT 1").get(nextPath);
+        if (conflictFolder || conflictArchive) return res.status(400).json({ error: 'Bu klasör adı zaten kullanılıyor.' });
+
+        renameArchivePath(currentPath, nextPath);
+        res.json({ success: true, data: { folder: nextPath } });
     });
 
     // ── Arşiv klasörü sil ───────────────────────────────────────
     router.delete('/archive/folders', (req, res) => {
-        const name = String(req.query.name || '').trim();
+        const name = normalizeArchivePath(req.query.name || '', '');
         if (!name) return res.status(400).json({ error: 'Klasör adı gerekli.' });
-        if (name === 'Genel') return res.status(400).json({ error: 'Genel klasörü silinemez.' });
 
-        // Silinen klasördeki dosyaları Genel'e taşı
-        db.prepare("UPDATE image_archive SET folder = 'Genel' WHERE COALESCE(folder, 'Genel') = ?").run(name);
-        db.prepare('DELETE FROM archive_folders WHERE name = ?').run(name);
-        res.json({ success: true });
+        const archiveRows = db.prepare("SELECT id, path FROM image_archive WHERE COALESCE(folder, 'Genel') = ? OR COALESCE(folder, 'Genel') LIKE ?").all(name, name + '/%');
+        for (const row of archiveRows) {
+            try { fs.unlinkSync(path.join(ARCHIVE_DIR, path.basename(row.path))); } catch {}
+        }
+
+        db.prepare("DELETE FROM image_archive WHERE COALESCE(folder, 'Genel') = ? OR COALESCE(folder, 'Genel') LIKE ?").run(name, name + '/%');
+        db.prepare('DELETE FROM archive_folders WHERE name = ? OR name LIKE ?').run(name, name + '/%');
+        res.json({ success: true, deleted: archiveRows.length });
     });
 
     // ── Arşive medya yükle ────────────────────────────────────────
@@ -228,19 +305,19 @@ module.exports = function (io) {
             return res.status(400).json({ error: 'Sadece görsel, video veya ses dosyası yüklenebilir.' });
         }
         const rawName = String(req.body.name || '').trim();
-
-        const folder  = String(req.body.folder || 'Genel').trim().substring(0, 60) || 'Genel';
+        const rawFolder = String(req.body.folder || '').trim();
+        const folder = rawFolder ? normalizeArchivePath(rawFolder) : 'Genel';
         const fallbackName = String(req.file.originalname || 'Yeni Dosya').replace(/\.[^.]+$/, '');
-        const name    = (rawName || fallbackName).substring(0, 100);
+        const name = (rawName || fallbackName).substring(0, 100);
         const webPath = '/media/archive/' + req.file.filename;
         const mediaType = archiveTypeFromMime(req.file.mimetype);
         if (!['image', 'video', 'audio'].includes(mediaType)) {
             try { fs.unlinkSync(req.file.path); } catch {}
             return res.status(400).json({ error: 'Arşiv türü desteklenmiyor.' });
         }
-        db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(folder, mediaType);
-        const result  = db.prepare('INSERT INTO image_archive (name, path, folder, media_type) VALUES (?, ?, ?, ?)').run(name, webPath, folder, mediaType);
-        const newRow  = db.prepare('SELECT * FROM image_archive WHERE id = ?').get(result.lastInsertRowid);
+        if (folder !== 'Genel') db.prepare('INSERT OR IGNORE INTO archive_folders (name, media_type) VALUES (?, ?)').run(folder, mediaType);
+        const result = db.prepare('INSERT INTO image_archive (name, path, folder, media_type) VALUES (?, ?, ?, ?)').run(name, webPath, folder, mediaType);
+        const newRow = db.prepare('SELECT * FROM image_archive WHERE id = ?').get(result.lastInsertRowid);
         res.json({ success: true, data: newRow });
     });
 

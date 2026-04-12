@@ -64,29 +64,35 @@
     .archive-filter-chip.active { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
     .archive-side-item { width:100%; text-align:left; border-radius:9999px; padding:8px 12px; font-size:.88rem; color:#4b5563; }
     .archive-side-item.active { background:#dbeafe; color:#1d4ed8; font-weight:600; }
-    .archive-folder-row { display:flex; align-items:center; gap:8px; border-radius:12px; padding:6px 8px; }
+    .archive-folder-row { display:flex; align-items:flex-start; gap:8px; border-radius:12px; padding:6px 8px; }
     .archive-folder-row.active { background:#dbeafe; }
-    .archive-folder-btn { flex:1; min-width:0; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px; color:#374151; }
+    .archive-folder-btn { flex:1; min-width:0; display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-radius:10px; color:#374151; text-align:left; }
     .archive-folder-row.active .archive-folder-btn { color:#1d4ed8; font-weight:600; }
-    .archive-folder-delete { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:#ef4444; }
-    .archive-folder-delete:hover { background:#fee2e2; }
+    .archive-folder-btn .folder-label { white-space:normal; word-break:break-word; line-height:1.35; }
+    .archive-folder-actions { display:flex; align-items:center; gap:4px; margin-left:auto; }
+    .archive-folder-delete, .archive-folder-rename, .archive-action-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:#6b7280; flex-shrink:0; }
+    .archive-folder-delete:hover, .archive-action-btn:hover { background:#fee2e2; color:#ef4444; }
+    .archive-folder-rename:hover { background:#e0e7ff; color:#4338ca; }
     .archive-folder-drop { outline:2px dashed #4f46e5; outline-offset:2px; background:#eef2ff; }
-    .archive-row { display:grid; grid-template-columns: minmax(220px, 1.6fr) minmax(120px, .8fr) minmax(130px, .9fr) minmax(80px, .4fr) 46px; gap:12px; align-items:center; padding:10px 12px; border-bottom:1px solid #eef2f7; }
+    .archive-breadcrumb { display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:#334155; font-size:.86rem; }
+    .archive-breadcrumb button { color:#2563eb; font-weight:500; }
+    .archive-breadcrumb .sep { color:#94a3b8; }
+    .archive-row { display:grid; grid-template-columns: minmax(240px, 1.7fr) minmax(120px, .7fr) minmax(130px, .7fr) minmax(110px, .6fr) minmax(92px, .55fr); gap:12px; align-items:flex-start; padding:12px; border-bottom:1px solid #eef2f7; }
     .archive-row:hover { background:#f8fafc; }
     .archive-row.head { background:#f8fafc; color:#6b7280; font-size:.77rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-    .archive-name-cell { display:flex; align-items:center; gap:10px; min-width:0; }
-    .archive-thumb { width:34px; height:34px; border-radius:8px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; }
+    .archive-row.folder-entry { background:#fcfdff; }
+    .archive-name-cell { display:flex; align-items:flex-start; gap:10px; min-width:0; }
+    .archive-thumb { width:36px; height:36px; border-radius:10px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; }
     .archive-thumb img { width:100%; height:100%; object-fit:cover; }
     .archive-thumb video { width:100%; height:100%; object-fit:cover; }
     .archive-name-main { min-width:0; }
-    .archive-name-main .title { font-size:.9rem; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .archive-name-main .sub { font-size:.75rem; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .archive-row .muted { color:#6b7280; font-size:.84rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .archive-delete-btn { width:30px; height:30px; border-radius:8px; color:#ef4444; display:flex; align-items:center; justify-content:center; }
-    .archive-delete-btn:hover { background:#fee2e2; }
+    .archive-name-main .title { font-size:.92rem; color:#111827; white-space:normal; overflow:visible; text-overflow:clip; word-break:break-word; line-height:1.35; }
+    .archive-name-main .sub { font-size:.76rem; color:#6b7280; white-space:normal; overflow:visible; text-overflow:clip; word-break:break-word; line-height:1.35; margin-top:2px; }
+    .archive-row .muted { color:#6b7280; font-size:.84rem; white-space:normal; overflow:visible; text-overflow:clip; word-break:break-word; line-height:1.35; }
+    .archive-actions { display:flex; align-items:center; justify-content:flex-end; gap:4px; }
 
     @media (max-width: 1023px) {
-      .archive-row { grid-template-columns: minmax(180px, 1fr) 90px 90px 52px; }
+      .archive-row { grid-template-columns: minmax(180px, 1fr) 100px 100px 88px; }
       .archive-row .owner-col { display:none; }
     }
 
@@ -531,7 +537,13 @@
               <span class="material-symbols-rounded text-gray-400" style="font-size:20px">tune</span>
             </div>
 
-            <div class="text-sm text-gray-500">Tüm dosyalar tek ekranda listelenir.</div>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div id="archiveBreadcrumb" class="archive-breadcrumb"></div>
+                <div id="archiveCurrentLabel" class="text-sm text-gray-500 mt-1">Ana arşiv</div>
+              </div>
+              <div class="text-xs text-gray-400">Drive gibi gezebilir, klasör içinde klasör açabilir, yeniden adlandırabilir ve silebilirsiniz.</div>
+            </div>
 
             <div class="flex flex-wrap gap-2">
               <button id="archiveCreateFolderBtn" class="px-3 py-2.5 text-sm rounded-xl text-indigo-700 bg-indigo-100 hover:bg-indigo-200 flex items-center gap-1.5"><span class="material-symbols-rounded" style="font-size:17px">create_new_folder</span>Klasör Ekle</button>
