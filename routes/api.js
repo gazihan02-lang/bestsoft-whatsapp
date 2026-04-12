@@ -121,6 +121,26 @@ module.exports = function (io) {
             res.status(500).json({ error: e.message });
         }
     });
+
+    // ── Bot 2 durumu ──────────────────────────────────────────────
+    router.get('/bot2/status', (req, res) => {
+        const bot2 = botClient.getInstance('bot2');
+        res.json(bot2.getBotStatus());
+    });
+
+    router.post('/bot2/wa-logout', async (req, res) => {
+        try {
+            const bot2 = botClient.getInstance('bot2');
+            await bot2.botLogout();
+            if (io) io.emit('bot2:status', { status: 'disconnected', message: 'WhatsApp oturumu kapatıldı' });
+            bot2.init(io);
+            if (io) io.emit('bot2:status', { status: 'initializing', message: 'Yeniden başlatılıyor' });
+            db.prepare('INSERT INTO logs (type, content) VALUES (?,?)').run('warning', '[bot2] WhatsApp oturumu manuel kapatıldı');
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
     // ── Zamanlanmış mesajları listele ─────────────────────────────
     router.get('/scheduled', (req, res) => {
         const messages = db.prepare('SELECT * FROM scheduled_messages WHERE sent = 0 ORDER BY send_at ASC').all();
