@@ -524,59 +524,69 @@
            ARCHIVES
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
       <section class="section" id="section-archives">
-        <div class="archive-drive-shell">
-          <div class="px-4 py-4 lg:px-5 border-b border-gray-100 flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-3">
-              <h2 class="text-3xl font-semibold tracking-tight text-gray-800">Arşivler</h2>
-
-            </div>
-
-            <div class="archive-toolbar-search">
-              <span class="material-symbols-rounded text-gray-500" style="font-size:20px">search</span>
-              <input id="archiveSearchInput" type="text" placeholder="Dosya ara">
-              <span class="material-symbols-rounded text-gray-400" style="font-size:20px">tune</span>
-            </div>
-
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div id="archiveBreadcrumb" class="archive-breadcrumb"></div>
-                <div id="archiveCurrentLabel" class="text-sm text-gray-500 mt-1">Ana arşiv</div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col" style="height: calc(100vh - 120px);">
+          <!-- HEADER / TOOLBAR -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/50 gap-4">
+            <div class="flex-1 flex flex-col min-w-0">
+              <h2 class="text-xl font-bold text-gray-900 tracking-tight mb-1">Dosya Yöneticisi</h2>
+              <div id="fmBreadcrumb" class="flex flex-wrap items-center gap-1 text-sm text-gray-500">
+                <button class="hover:text-indigo-600 transition-colors flex items-center font-medium" data-fm-path=""><span class="material-symbols-rounded" style="font-size:18px">home</span> &nbsp;Ana Dizin</button>
               </div>
-              <div class="text-xs text-gray-400">Drive gibi gezebilir, klasör içinde klasör açabilir, yeniden adlandırabilir ve silebilirsiniz.</div>
             </div>
-
-            <div class="flex flex-wrap gap-2">
-              <button id="archiveCreateFolderBtn" class="px-3 py-2.5 text-sm rounded-xl text-indigo-700 bg-indigo-100 hover:bg-indigo-200 flex items-center gap-1.5"><span class="material-symbols-rounded" style="font-size:17px">create_new_folder</span>Klasör Ekle</button>
-              <button id="archiveUploadBtn" class="px-3 py-2.5 text-sm rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5"><span class="material-symbols-rounded" style="font-size:17px">upload_file</span>Yükle</button>
-              <input id="archiveFileInput" type="file" accept="image/*,video/*,audio/*" class="hidden">
-              <datalist id="archiveFolderList"></datalist>
+            
+            <div class="flex items-center gap-2">
+              <div class="hidden lg:flex items-center bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                <span class="material-symbols-rounded text-gray-400" style="font-size:18px">search</span>
+                <input type="text" id="fmSearchInput" placeholder="Dosya ara..." class="bg-transparent border-none focus:outline-none text-sm ml-2 w-32 xl:w-48">
+              </div>
+              <button id="fmNewFolderBtn" class="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-sm font-medium transition-colors">
+                <span class="material-symbols-rounded" style="font-size:18px">create_new_folder</span><span class="hidden sm:inline">Klasör</span>
+              </button>
+              <button id="fmUploadBtn" class="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-sm font-medium shadow-sm transition-colors">
+                <span class="material-symbols-rounded" style="font-size:18px">upload_file</span><span class="hidden sm:inline">Yükle</span>
+              </button>
+              <input type="file" id="fmFileInput" class="hidden" accept="image/*,video/*,audio/*" multiple>
             </div>
           </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-[230px,1fr] min-h-[520px]">
-            <aside class="border-r border-gray-100 p-3 bg-gray-50/60">
-              <div class="text-xs uppercase tracking-wide text-gray-500 font-semibold px-3 pb-2">Klasörler</div>
-              <div id="archiveFolderListPanel" class="flex flex-col gap-1"></div>
-            </aside>
-
-            <div>
-              <div class="archive-row head">
-                <div>Ad</div>
-                <div class="owner-col">Sahibi</div>
-                <div>Değiştirilme tarihi</div>
-                <div>Boyut</div>
-                <div></div>
-              </div>
-              <div id="archiveGrid">
-                <div class="empty-state">
-                  <span class="material-symbols-rounded">folder_open</span>
-                  Arşiv boş
-                </div>
+          
+          <!-- MAIN AREA -->
+          <div class="flex-1 overflow-y-auto bg-white p-5" id="fmMainArea">
+            <div class="grid grid-cols-[1fr,120px,100px,60px] gap-4 mb-2 pb-2 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider px-3">
+              <div>İsim</div>
+              <div class="hidden sm:block">Değiştirilme</div>
+              <div class="hidden sm:block">Boyut</div>
+              <div class="text-right">İşlem</div>
+            </div>
+            
+            <div id="fmGrid" class="flex flex-col gap-1">
+              <div class="py-10 text-center text-gray-400 flex flex-col items-center">
+                <span class="material-symbols-rounded" style="font-size:40px; opacity:0.5">folder_open</span>
+                <span class="mt-2 text-sm font-medium">Klasör boş</span>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- FM MODALS -->
+        <div id="fmRenameModal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/40 p-4">
+          <div class="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-100">
+              <h3 class="text-base font-semibold text-gray-900" id="fmRenameTitle">Yeniden Adlandır</h3>
+            </div>
+            <div class="px-5 py-4">
+              <input type="hidden" id="fmRenameType">
+              <input type="hidden" id="fmRenameIdOrPath">
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">Eski Ad: <span id="fmRenameOldName" class="text-gray-800"></span></label>
+              <input id="fmRenameInput" type="text" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+            </div>
+            <div class="px-5 pb-5 flex justify-end gap-2">
+              <button id="fmRenameCancel" class="px-4 py-2.5 text-sm rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200">Vazgeç</button>
+              <button id="fmRenameSave" class="px-4 py-2.5 text-sm rounded-xl text-white bg-indigo-600 hover:bg-indigo-700">Değiştir</button>
+            </div>
+          </div>
+        </div>
       </section>
+
 
 
       <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -798,5 +808,6 @@
   </script>
 
   <script src="/js/dashboard.js?v=20260412-archive2"></script>
+<script src="/js/fm.js"></script>
 </body>
 </html>
