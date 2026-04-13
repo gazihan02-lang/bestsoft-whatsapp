@@ -185,7 +185,7 @@ module.exports = function (io) {
     });
 
     // ── Zamanlanmış mesajı güncelle ──────────────────────────────
-    router.patch('/scheduled/:id', (req, res) => {
+    router.patch('/scheduled/:id', uploadMedia.single('file'), (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
         const { message, send_at, repeat_type } = req.body;
@@ -193,8 +193,20 @@ module.exports = function (io) {
         const sendAtDate = new Date(send_at);
         if (isNaN(sendAtDate.getTime())) return res.status(400).json({ error: 'Geçersiz tarih.' });
         cancelScheduledById(id);
-        db.prepare('UPDATE scheduled_messages SET message = ?, send_at = ?, repeat_type = ? WHERE id = ?')
-            .run(message ?? '', sendAtDate.toISOString(), repeat_type || 'none', id);
+        if (req.file) {
+            const mime = req.file.mimetype || '';
+            const mediaType = mime.startsWith('video') ? 'video' : mime.startsWith('audio') ? 'audio' : 'image';
+            // Eski dosyayı sil
+            const old = db.prepare('SELECT media_path FROM scheduled_messages WHERE id = ?').get(id);
+            if (old && old.media_path && fs.existsSync(old.media_path)) {
+                try { fs.unlinkSync(old.media_path); } catch {}
+            }
+            db.prepare('UPDATE scheduled_messages SET message = ?, send_at = ?, repeat_type = ?, media_path = ?, media_type = ? WHERE id = ?')
+                .run(message ?? '', sendAtDate.toISOString(), repeat_type || 'none', req.file.path, mediaType, id);
+        } else {
+            db.prepare('UPDATE scheduled_messages SET message = ?, send_at = ?, repeat_type = ? WHERE id = ?')
+                .run(message ?? '', sendAtDate.toISOString(), repeat_type || 'none', id);
+        }
         const updated = db.prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(id);
         if (updated) {
             const delayMs = Math.max(sendAtDate.getTime() - Date.now(), 0);

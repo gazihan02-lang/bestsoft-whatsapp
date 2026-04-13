@@ -536,9 +536,16 @@
               <img id="editSchedulePreviewImg" class="hidden w-full max-h-52 object-contain bg-gray-100">
               <video id="editSchedulePreviewVid" class="hidden w-full max-h-52 bg-black" controls></video>
               <audio id="editSchedulePreviewAud" class="hidden w-full" controls></audio>
-              <div class="px-3 py-2 text-xs text-gray-500 flex items-center gap-1.5" id="editScheduleMediaLabel">
-                <span class="material-symbols-rounded" style="font-size:15px">attachment</span>
-                <span id="editScheduleMediaName"></span>
+              <div class="px-3 py-2 text-xs text-gray-500 flex items-center justify-between gap-2" id="editScheduleMediaLabel">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="material-symbols-rounded" style="font-size:15px">attachment</span>
+                  <span id="editScheduleMediaName" class="truncate"></span>
+                </div>
+                <button id="editScheduleReplaceBtn" type="button"
+                  class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
+                  <span class="material-symbols-rounded" style="font-size:14px">upload</span>Değiştir
+                </button>
+                <input type="file" id="editScheduleFileInput" class="hidden" accept="image/*,video/*,audio/*">
               </div>
             </div>
             <div>

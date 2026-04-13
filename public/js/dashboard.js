@@ -624,6 +624,9 @@ window.deleteScheduled = async (id) => {
 let _editScheduleAll = [];
 
 window.openEditSchedule = (id) => {
+    _editScheduleNewFile = null;
+    const fileInput = document.getElementById('editScheduleFileInput');
+    if (fileInput) fileInput.value = '';
     const m = _editScheduleAll.find(x => x.id === id);
     if (!m) return;
     document.getElementById('editScheduleId').value = id;
@@ -678,6 +681,31 @@ document.getElementById('editScheduleModal')?.addEventListener('click', (e) => {
     if (e.target === document.getElementById('editScheduleModal')) closeEditScheduleModal();
 });
 
+// Medya değiştir butonu
+let _editScheduleNewFile = null;
+document.getElementById('editScheduleReplaceBtn')?.addEventListener('click', () => {
+    document.getElementById('editScheduleFileInput').click();
+});
+document.getElementById('editScheduleFileInput')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    _editScheduleNewFile = file;
+    const previewImg = document.getElementById('editSchedulePreviewImg');
+    const previewVid = document.getElementById('editSchedulePreviewVid');
+    const previewAud = document.getElementById('editSchedulePreviewAud');
+    [previewImg, previewVid, previewAud].forEach(el => { el.classList.add('hidden'); if (el.src) el.src = ''; });
+    document.getElementById('editScheduleMediaName').textContent = file.name;
+    document.getElementById('editScheduleMediaPreview').classList.remove('hidden');
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('image')) {
+        previewImg.src = url; previewImg.classList.remove('hidden');
+    } else if (file.type.startsWith('video')) {
+        previewVid.src = url; previewVid.classList.remove('hidden');
+    } else if (file.type.startsWith('audio')) {
+        previewAud.src = url; previewAud.classList.remove('hidden');
+    }
+});
+
 document.getElementById('editScheduleSave')?.addEventListener('click', async () => {
     const id = document.getElementById('editScheduleId').value;
     const message = document.getElementById('editScheduleMessage').value;
@@ -686,11 +714,21 @@ document.getElementById('editScheduleSave')?.addEventListener('click', async () 
     const repeat_type = document.getElementById('editScheduleRepeat').value;
     if (!date || !time) { showSnack('Tarih ve saat zorunlu.', true); return; }
     const send_at = new Date(`${date}T${time}`).toISOString();
-    const res = await fetch(`/api/scheduled/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, send_at, repeat_type })
-    });
+    let res;
+    if (_editScheduleNewFile) {
+        const fd = new FormData();
+        fd.append('file', _editScheduleNewFile);
+        fd.append('message', message);
+        fd.append('send_at', send_at);
+        fd.append('repeat_type', repeat_type);
+        res = await fetch(`/api/scheduled/${id}`, { method: 'PATCH', body: fd });
+    } else {
+        res = await fetch(`/api/scheduled/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, send_at, repeat_type })
+        });
+    }
     if (res.ok) {
         closeEditScheduleModal();
         loadScheduled();
