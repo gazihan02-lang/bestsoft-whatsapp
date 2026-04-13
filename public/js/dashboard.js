@@ -718,6 +718,7 @@ function renderScheduleTable(msgs) {
         const dt = new Date(m.send_at);
         const dateStr = dt.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
         const timeStr = dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        const dayStr  = dt.toLocaleDateString('tr-TR', { weekday: 'long' });
 
         let groupLabel = '';
         if (m.chat_ids) {
@@ -743,9 +744,10 @@ function renderScheduleTable(msgs) {
         const repeatLabel = repeatMap[m.repeat_type || 'none'];
 
         return `<div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors border-b border-gray-50 last:border-b-0">
-            <div class="flex-shrink-0 text-center w-14">
-              <div class="text-sm font-bold text-gray-800 leading-tight">${timeStr}</div>
+            <div class="flex-shrink-0 text-center w-16">
               <div class="text-[11px] text-gray-400 leading-tight">${dateStr}</div>
+              <div class="text-sm font-bold text-gray-800 leading-tight mt-0.5">${timeStr}</div>
+              <div class="text-[11px] font-medium text-red-500 leading-tight mt-0.5 capitalize">${dayStr}</div>
             </div>
             <div class="w-px h-8 bg-gray-100 flex-shrink-0"></div>
             <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center" style="color:${typeColor}">
