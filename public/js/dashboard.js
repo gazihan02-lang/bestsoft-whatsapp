@@ -629,48 +629,62 @@ function renderScheduleTable(msgs) {
     _editScheduleAll = msgs;
 
     if (!msgs.length) {
-        tbody.innerHTML = `<tr><td colspan="4">
-            <div class="empty-state"><span class="material-symbols-rounded">schedule</span>Bekleyen mesaj yok</div>
-        </td></tr>`;
+        tbody.innerHTML = `<div class="empty-state"><span class="material-symbols-rounded">schedule</span>Bekleyen mesaj yok</div>`;
         return;
     }
 
     tbody.innerHTML = msgs.map(m => {
-        const sendAt = new Date(m.send_at).toLocaleString('tr-TR');
-        let groupCells = '';
+        const dt = new Date(m.send_at);
+        const dateStr = dt.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+        let groupLabel = '';
         if (m.chat_ids) {
             try {
                 const ids = JSON.parse(m.chat_ids);
-                groupCells = `<span class="td-groups-badge"><span class="material-symbols-rounded" style="font-size:13px">groups</span>${ids.length} grup</span>`;
+                groupLabel = `<span class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:12px">groups</span>${ids.length} grup</span>`;
             } catch {}
         }
-        if (!groupCells) groupCells = `<span class="td-truncate" style="font-size:0.8rem">${escHtml(m.chat_id)}</span>`;
+        if (!groupLabel) groupLabel = `<span class="text-xs text-gray-500">${escHtml(m.chat_id || '')}</span>`;
 
-        const contentLabel = m.media_type === 'image' ? '🖼 Resim'
-                           : m.media_type === 'video' ? '🎥 Video'
-                           : m.media_type === 'audio' ? '🎤 Ses'
-                           : escHtml((m.message || '').substring(0, 60));
+        const typeIcon  = m.media_type === 'image' ? 'image'
+                        : m.media_type === 'video' ? 'videocam'
+                        : m.media_type === 'audio' ? 'mic'
+                        : 'chat';
+        const typeColor = m.media_type ? '#6366f1' : '#9ca3af';
 
-        const repeatMap = { none: 'Tek Sefer', daily: 'Her Gün', weekly: 'Her Hafta', monthly: 'Her Ay' };
-        const repeatLabel = repeatMap[m.repeat_type || 'none'] || 'Tek Sefer';
+        const contentLabel = m.media_type === 'image' ? 'Resim'
+                           : m.media_type === 'video' ? 'Video'
+                           : m.media_type === 'audio' ? 'Ses'
+                           : escHtml((m.message || '').substring(0, 90));
 
-        return `<tr>
-            <td>${groupCells}</td>
-            <td class="td-truncate">${contentLabel}</td>
-            <td style="white-space:nowrap">${sendAt}<div style="font-size:.75rem;color:#6b7280">${repeatLabel}</div></td>
-            <td>
-                <div class="flex items-center gap-1">
-                    <button onclick="openEditSchedule(${m.id})" title="Güncelle"
-                        class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors">
-                        <span class="material-symbols-rounded" style="font-size:18px">edit</span>
-                    </button>
-                    <button onclick="deleteScheduled(${m.id})" title="İptal Et"
-                        class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                        <span class="material-symbols-rounded" style="font-size:18px">delete</span>
-                    </button>
-                </div>
-            </td>
-        </tr>`;
+        const repeatMap = { none: '', daily: 'Her Gün', weekly: 'Her Hafta', monthly: 'Her Ay' };
+        const repeatLabel = repeatMap[m.repeat_type || 'none'];
+
+        return `<div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors border-b border-gray-50 last:border-b-0">
+            <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center" style="color:${typeColor}">
+              <span class="material-symbols-rounded" style="font-size:20px">${typeIcon}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-800 truncate">${contentLabel}</p>
+              <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                ${groupLabel}
+                ${repeatLabel ? `<span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:12px">repeat</span>${repeatLabel}</span>` : ''}
+              </div>
+            </div>
+            <div class="flex-shrink-0 text-right mr-1">
+              <div class="text-sm font-semibold text-gray-800">${timeStr}</div>
+              <div class="text-xs text-gray-400">${dateStr}</div>
+            </div>
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+              <button onclick="openEditSchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors">
+                <span class="material-symbols-rounded" style="font-size:18px">edit</span>
+              </button>
+              <button onclick="deleteScheduled(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                <span class="material-symbols-rounded" style="font-size:18px">delete</span>
+              </button>
+            </div>
+          </div>`;
     }).join('');
 }
 
