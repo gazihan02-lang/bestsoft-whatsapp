@@ -795,7 +795,7 @@ window.showDayMessages = (yr, mo, day) => {
 
     const msgRows = msgs.map(m => {
         const timeStr = new Date(m.send_at).toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
-        const repeatMap = { none:'', daily:'Her Gün', weekly:'Her Hafta', monthly:'Her Ay' };
+        const repeatMap = { none:'', weekly:'Her Hafta', monthly:'Her Ay' };
         const repeatLabel = repeatMap[m.repeat_type || 'none'];
         const typeIcon  = m.media_type==='image' ? 'image' : m.media_type==='video' ? 'videocam' : m.media_type==='audio' ? 'mic' : 'chat';
         const typeColor = m.media_type ? '#6366f1' : '#9ca3af';
