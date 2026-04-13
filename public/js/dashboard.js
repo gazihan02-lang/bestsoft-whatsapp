@@ -743,6 +743,11 @@ function renderScheduleTable(msgs) {
         const repeatLabel = repeatMap[m.repeat_type || 'none'];
 
         return `<div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors border-b border-gray-50 last:border-b-0">
+            <div class="flex-shrink-0 text-center w-14">
+              <div class="text-sm font-bold text-gray-800 leading-tight">${timeStr}</div>
+              <div class="text-[11px] text-gray-400 leading-tight">${dateStr}</div>
+            </div>
+            <div class="w-px h-8 bg-gray-100 flex-shrink-0"></div>
             <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center" style="color:${typeColor}">
               <span class="material-symbols-rounded" style="font-size:20px">${typeIcon}</span>
             </div>
@@ -752,10 +757,6 @@ function renderScheduleTable(msgs) {
                 ${groupLabel}
                 ${repeatLabel ? `<span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:12px">repeat</span>${repeatLabel}</span>` : ''}
               </div>
-            </div>
-            <div class="flex-shrink-0 text-right mr-1">
-              <div class="text-sm font-semibold text-gray-800">${timeStr}</div>
-              <div class="text-xs text-gray-400">${dateStr}</div>
             </div>
             <div class="flex items-center gap-0.5 flex-shrink-0">
               <button onclick="openEditSchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors">
