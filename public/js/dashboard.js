@@ -724,12 +724,11 @@ function renderScheduleTable(msgs) {
 
     let calHtml = '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">';
 
-    const startMonth = today.getMonth();
     const startYear  = today.getFullYear();
 
     for (let i = 0; i < 12; i++) {
-        const mo   = (startMonth + i) % 12;
-        const yr   = startYear + Math.floor((startMonth + i) / 12);
+        const mo   = i;
+        const yr   = startYear;
         const daysInMonth = new Date(yr, mo + 1, 0).getDate();
         let dow = new Date(yr, mo, 1).getDay();
         dow = dow === 0 ? 6 : dow - 1; // Mon=0
