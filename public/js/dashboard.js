@@ -818,6 +818,7 @@ window.showDayMessages = (yr, mo, day) => {
             </div>
           </div>
           <div class="flex items-center gap-0.5 flex-shrink-0">
+            <button onclick="openCopySchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-emerald-400 hover:bg-emerald-50 transition-colors" title="Diğer tarihlere kopyala"><span class="material-symbols-rounded" style="font-size:16px">content_copy</span></button>
             <button onclick="openEditSchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors"><span class="material-symbols-rounded" style="font-size:16px">edit</span></button>
             <button onclick="deleteScheduled(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"><span class="material-symbols-rounded" style="font-size:16px">delete</span></button>
           </div>
@@ -928,6 +929,120 @@ document.getElementById('editScheduleClose')?.addEventListener('click', closeEdi
 document.getElementById('editScheduleCancel')?.addEventListener('click', closeEditScheduleModal);
 document.getElementById('editScheduleModal')?.addEventListener('click', (e) => {
     if (e.target === document.getElementById('editScheduleModal')) closeEditScheduleModal();
+});
+
+/* ── Diğer Tarihlere Kopyala Modal ── */
+let _copyScheduleId = null;
+let _copyCalYear = 0;
+let _copyCalMonth = 0;
+let _copySelectedDates = new Set();
+
+const _COPY_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const _COPY_DAYS   = ['Pt','Sa','Çr','Pe','Cu','Ct','Pz'];
+
+window.openCopySchedule = (id) => {
+    _copyScheduleId = id;
+    _copySelectedDates = new Set();
+    const today = new Date();
+    _copyCalYear  = today.getFullYear();
+    _copyCalMonth = today.getMonth();
+    renderCopyCalendar();
+    renderCopySelectedChips();
+    const modal = document.getElementById('copyScheduleModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+function closeCopyModal() {
+    document.getElementById('copyScheduleModal').classList.add('hidden');
+    document.getElementById('copyScheduleModal').classList.remove('flex');
+}
+
+function renderCopyCalendar() {
+    const yr = _copyCalYear, mo = _copyCalMonth;
+    document.getElementById('copyCalTitle').textContent = `${_COPY_MONTHS[mo]} ${yr}`;
+    const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+    let dow = new Date(yr, mo, 1).getDay();
+    dow = dow === 0 ? 6 : dow - 1;
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+    let html = '<div class="grid grid-cols-7 mb-1">';
+    html += _COPY_DAYS.map(d => `<div class="text-center text-[10px] font-semibold text-gray-400 py-1">${d}</div>`).join('');
+    html += '</div><div class="grid grid-cols-7 gap-y-1">';
+    html += Array(dow).fill('<div></div>').join('');
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const isPast = dateStr <= todayStr;
+        const isSelected = _copySelectedDates.has(dateStr);
+        if (isPast) {
+            html += `<div class="flex items-center justify-center py-0.5"><span class="w-8 h-8 flex items-center justify-center text-xs text-gray-300">${day}</span></div>`;
+        } else if (isSelected) {
+            html += `<div class="flex items-center justify-center py-0.5"><button onclick="toggleCopyDate('${dateStr}')" class="w-8 h-8 rounded-full text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 transition-colors">${day}</button></div>`;
+        } else {
+            html += `<div class="flex items-center justify-center py-0.5"><button onclick="toggleCopyDate('${dateStr}')" class="w-8 h-8 rounded-full text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">${day}</button></div>`;
+        }
+    }
+    html += '</div>';
+    document.getElementById('copyCalGrid').innerHTML = html;
+}
+
+window.toggleCopyDate = (dateStr) => {
+    if (_copySelectedDates.has(dateStr)) _copySelectedDates.delete(dateStr);
+    else _copySelectedDates.add(dateStr);
+    renderCopyCalendar();
+    renderCopySelectedChips();
+};
+
+function renderCopySelectedChips() {
+    const container = document.getElementById('copySelectedDates');
+    if (!_copySelectedDates.size) {
+        container.innerHTML = '<span class="text-xs text-gray-400">Takvimden tarih seçin</span>';
+        return;
+    }
+    const MONTHS_SHORT = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    container.innerHTML = [..._copySelectedDates].sort().map(d => {
+        const [,m,day] = d.split('-');
+        return `<span class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg">
+            ${parseInt(day)} ${MONTHS_SHORT[parseInt(m)-1]}
+            <button onclick="toggleCopyDate('${d}')" class="text-indigo-400 hover:text-indigo-600 leading-none"><span class="material-symbols-rounded" style="font-size:12px">close</span></button>
+        </span>`;
+    }).join('');
+}
+
+document.getElementById('copyCalPrev')?.addEventListener('click', () => {
+    if (_copyCalMonth === 0) { _copyCalMonth = 11; _copyCalYear--; } else _copyCalMonth--;
+    renderCopyCalendar();
+});
+document.getElementById('copyCalNext')?.addEventListener('click', () => {
+    if (_copyCalMonth === 11) { _copyCalMonth = 0; _copyCalYear++; } else _copyCalMonth++;
+    renderCopyCalendar();
+});
+document.getElementById('copyScheduleClose')?.addEventListener('click', closeCopyModal);
+document.getElementById('copyScheduleCancel')?.addEventListener('click', closeCopyModal);
+document.getElementById('copyScheduleModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('copyScheduleModal')) closeCopyModal();
+});
+document.getElementById('copyScheduleConfirm')?.addEventListener('click', async () => {
+    if (!_copySelectedDates.size) { showSnack('En az bir tarih seçin.', true); return; }
+    const btn = document.getElementById('copyScheduleConfirm');
+    btn.disabled = true;
+    const res = await fetch(`/api/scheduled/${_copyScheduleId}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dates: [..._copySelectedDates] })
+    });
+    btn.disabled = false;
+    if (res.ok) {
+        const data = await res.json();
+        showSnack(`${data.created} tarih için mesaj kopyalandı.`);
+        closeCopyModal();
+        loadScheduled();
+    } else {
+        const data = await res.json().catch(() => ({}));
+        showSnack(data.error || 'Kopyalama başarısız.', true);
+    }
 });
 
 // Medya değiştir — arşiv seçici modal
