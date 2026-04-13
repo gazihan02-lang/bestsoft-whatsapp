@@ -42,6 +42,19 @@ function initScheduler(client, io = null) {
     console.log(`⏰ ${pending.length} bekleyen zamanlanmış mesaj yüklendi.`);
 }
 
+// setTimeout maksimum ~24.8 gün destekler (2^31-1 ms).
+// Daha uzun gecikmeler için özyinelemeli bekleme.
+const MAX_TIMEOUT_MS = 2_000_000_000; // ~23.1 gün, güvenli alt sınır
+
+function safeSetTimeout(fn, delayMs) {
+    if (delayMs > MAX_TIMEOUT_MS) {
+        return setTimeout(() => {
+            safeSetTimeout(fn, delayMs - MAX_TIMEOUT_MS);
+        }, MAX_TIMEOUT_MS);
+    }
+    return setTimeout(fn, delayMs);
+}
+
 /**
  * Belirli bir gecikme sonra mesaj gönderir ve DB'yi günceller.
  * msgObj: { id, chat_id, chat_ids, message, media_path, media_type }
@@ -49,7 +62,7 @@ function initScheduler(client, io = null) {
 function addScheduledTimeout(client, msgObj, delayMs, io = null) {
     const id = msgObj.id;
 
-    const handle = setTimeout(async () => {
+    const handle = safeSetTimeout(async () => {
         try {
             if (client) {
                 // Hedef chat ID'lerini parse et
@@ -95,7 +108,7 @@ function addScheduledTimeout(client, msgObj, delayMs, io = null) {
         } finally {
             if ((msgObj.repeat_type || 'none') === 'none') activeTimeouts.delete(id);
         }
-    }, delayMs);
+    }, Math.max(delayMs, 0));
 
     activeTimeouts.set(id, handle);
 }
