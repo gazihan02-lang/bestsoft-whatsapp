@@ -746,6 +746,7 @@ document.getElementById('editScheduleModal')?.addEventListener('click', (e) => {
 // Medya değiştir — arşiv seçici modal
 let _editScheduleNewFile = null;
 let _editScheduleArchiveItem = null; // { path, media_type, name }
+let _editMediaPickerSelected = null;
 
 function openEditMediaPicker() {
     _editMediaPickerSelected = null;
