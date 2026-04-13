@@ -735,6 +735,9 @@ function renderScheduleTable(msgs) {
                         : 'chat';
         const typeColor = m.media_type ? '#6366f1' : '#9ca3af';
 
+        const mediaIdx = m.media_path ? m.media_path.indexOf('/media/') : -1;
+        const mediaSrc = m.media_path ? (mediaIdx !== -1 ? m.media_path.slice(mediaIdx) : '/' + m.media_path.split('/').pop()) : '';
+
         const contentLabel = m.media_type === 'image' ? 'Resim'
                            : m.media_type === 'video' ? 'Video'
                            : m.media_type === 'audio' ? 'Ses'
@@ -750,7 +753,7 @@ function renderScheduleTable(msgs) {
               <div class="text-sm font-bold text-gray-800 leading-tight mt-0.5">${timeStr}</div>
             </div>
             <div class="w-px h-8 bg-gray-100 flex-shrink-0"></div>
-            <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center" style="color:${typeColor}">
+            <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center${mediaSrc && m.media_type === 'image' ? ' cursor-pointer schedule-media-icon' : ''}" style="color:${typeColor}"${mediaSrc && m.media_type === 'image' ? ` data-src="${mediaSrc}"` : ''}>
               <span class="material-symbols-rounded" style="font-size:20px">${typeIcon}</span>
             </div>
             <div class="flex-1 min-w-0">
@@ -770,6 +773,36 @@ function renderScheduleTable(msgs) {
             </div>
           </div>`;
     }).join('');
+
+    // Attach hover preview events to image icons
+    const tooltip   = document.getElementById('mediaHoverTooltip');
+    const tooltipImg = document.getElementById('mediaHoverImg');
+    document.querySelectorAll('.schedule-media-icon').forEach(el => {
+        el.addEventListener('mouseenter', (e) => {
+            const src = el.dataset.src;
+            if (!src) return;
+            tooltipImg.src = src;
+            tooltip.classList.remove('hidden');
+            positionTooltip(e);
+        });
+        el.addEventListener('mousemove', positionTooltip);
+        el.addEventListener('mouseleave', () => {
+            tooltip.classList.add('hidden');
+            tooltipImg.src = '';
+        });
+    });
+}
+
+function positionTooltip(e) {
+    const tooltip = document.getElementById('mediaHoverTooltip');
+    const margin = 14;
+    const tw = 220, th = 240;
+    let x = e.clientX + margin;
+    let y = e.clientY + margin;
+    if (x + tw > window.innerWidth)  x = e.clientX - tw - margin;
+    if (y + th > window.innerHeight) y = e.clientY - th - margin;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
 }
 
 window.deleteScheduled = async (id) => {
