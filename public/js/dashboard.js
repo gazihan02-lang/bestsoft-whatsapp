@@ -705,100 +705,157 @@ function loadScheduled() {
 }
 
 function renderScheduleTable(msgs) {
-    const tbody = document.getElementById('scheduleTableBody');
+    const container = document.getElementById('scheduleTableBody');
     document.getElementById('statScheduled').textContent = msgs.length;
     _editScheduleAll = msgs;
 
+    // Build lookup: "YYYY-M-D" -> [msg,...]
+    const msgsByDate = {};
+    msgs.forEach(m => {
+        const d = new Date(m.send_at);
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if (!msgsByDate[key]) msgsByDate[key] = [];
+        msgsByDate[key].push(m);
+    });
+
+    const today = new Date();
+    const MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    const DAYS   = ['Pt','Sa','Çr','Pe','Cu','Ct','Pz'];
+
+    let calHtml = '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">';
+
+    const startMonth = today.getMonth();
+    const startYear  = today.getFullYear();
+
+    for (let i = 0; i < 12; i++) {
+        const mo   = (startMonth + i) % 12;
+        const yr   = startYear + Math.floor((startMonth + i) / 12);
+        const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+        let dow = new Date(yr, mo, 1).getDay();
+        dow = dow === 0 ? 6 : dow - 1; // Mon=0
+
+        calHtml += `<div class="rounded-xl border border-gray-100 overflow-hidden bg-white">
+          <div class="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <span class="text-xs font-bold text-gray-700">${MONTHS[mo]}</span>
+            <span class="text-[10px] text-gray-400">${yr}</span>
+          </div>
+          <div class="p-2">
+            <div class="grid grid-cols-7 mb-1">
+              ${DAYS.map(d => `<div class="text-center text-[9px] font-semibold text-gray-300">${d}</div>`).join('')}
+            </div>
+            <div class="grid grid-cols-7 gap-y-0.5">
+              ${Array(dow).fill('<div></div>').join('')}
+              ${Array.from({length: daysInMonth}, (_, di) => {
+                  const day = di + 1;
+                  const key = `${yr}-${mo}-${day}`;
+                  const dayMsgs = msgsByDate[key] || [];
+                  const isToday = today.getFullYear()===yr && today.getMonth()===mo && today.getDate()===day;
+                  const hasMsgs = dayMsgs.length > 0;
+                  if (hasMsgs) {
+                      return `<div class="relative flex items-center justify-center">
+                        <button onclick="showDayMessages(${yr},${mo},${day})"
+                          class="w-6 h-6 rounded-full text-[10px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 transition-colors flex items-center justify-center leading-none">${day}</button>
+                        ${dayMsgs.length > 1 ? `<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] text-[8px] font-bold text-white bg-rose-500 rounded-full flex items-center justify-center px-0.5">${dayMsgs.length}</span>` : ''}
+                      </div>`;
+                  }
+                  if (isToday) {
+                      return `<div class="flex items-center justify-center">
+                        <span class="w-6 h-6 rounded-full text-[10px] font-semibold text-indigo-600 bg-indigo-50 flex items-center justify-center">${day}</span>
+                      </div>`;
+                  }
+                  return `<div class="flex items-center justify-center">
+                    <span class="text-[10px] text-gray-400">${day}</span>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    calHtml += '</div>';
+    calHtml += '<div id="dayMsgsPanel" class="hidden px-4 pb-4"></div>';
+
     if (!msgs.length) {
-        tbody.innerHTML = `<div class="empty-state"><span class="material-symbols-rounded">schedule</span>Bekleyen mesaj yok</div>`;
+        container.innerHTML = `<div class="empty-state"><span class="material-symbols-rounded">schedule</span>Bekleyen mesaj yok</div>`;
         return;
     }
 
-    tbody.innerHTML = msgs.map(m => {
-        const dt = new Date(m.send_at);
-        const dateStr = dt.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
-        const timeStr = dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-        const dayStr  = dt.toLocaleDateString('tr-TR', { weekday: 'long' });
+    container.innerHTML = calHtml;
+}
 
-        let groupLabel = '';
-        if (m.chat_ids) {
-            try {
-                const ids = JSON.parse(m.chat_ids);
-                groupLabel = `<span class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:12px">groups</span>${ids.length} grup</span>`;
-            } catch {}
-        }
-        if (!groupLabel) groupLabel = `<span class="text-xs text-gray-500">${escHtml(m.chat_id || '')}</span>`;
+window.showDayMessages = (yr, mo, day) => {
+    const MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    const msgs = _editScheduleAll.filter(m => {
+        const d = new Date(m.send_at);
+        return d.getFullYear()===yr && d.getMonth()===mo && d.getDate()===day;
+    });
+    const panel = document.getElementById('dayMsgsPanel');
+    if (!msgs.length) { panel.classList.add('hidden'); return; }
 
-        const typeIcon  = m.media_type === 'image' ? 'image'
-                        : m.media_type === 'video' ? 'videocam'
-                        : m.media_type === 'audio' ? 'mic'
-                        : 'chat';
-        const typeColor = m.media_type ? '#6366f1' : '#9ca3af';
+    const dayStr = new Date(yr, mo, day).toLocaleDateString('tr-TR', { weekday: 'long' });
 
-        const mediaIdx = m.media_path ? m.media_path.indexOf('/media/') : -1;
-        const mediaSrc = m.media_path ? (mediaIdx !== -1 ? m.media_path.slice(mediaIdx) : '/' + m.media_path.split('/').pop()) : '';
-
-        const contentLabel = m.media_type === 'image' ? 'Resim'
-                           : m.media_type === 'video' ? 'Video'
-                           : m.media_type === 'audio' ? 'Ses'
-                           : escHtml((m.message || '').substring(0, 90));
-
-        const repeatMap = { none: '', daily: 'Her Gün', weekly: 'Her Hafta', monthly: 'Her Ay' };
+    const msgRows = msgs.map(m => {
+        const timeStr = new Date(m.send_at).toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
+        const repeatMap = { none:'', daily:'Her Gün', weekly:'Her Hafta', monthly:'Her Ay' };
         const repeatLabel = repeatMap[m.repeat_type || 'none'];
+        const typeIcon  = m.media_type==='image' ? 'image' : m.media_type==='video' ? 'videocam' : m.media_type==='audio' ? 'mic' : 'chat';
+        const typeColor = m.media_type ? '#6366f1' : '#9ca3af';
+        const mediaIdx  = m.media_path ? m.media_path.indexOf('/media/') : -1;
+        const mediaSrc  = m.media_path ? (mediaIdx!==-1 ? m.media_path.slice(mediaIdx) : '/'+m.media_path.split('/').pop()) : '';
+        let groupLabel = '';
+        if (m.chat_ids) { try { const ids=JSON.parse(m.chat_ids); groupLabel=`<span class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:11px">groups</span>${ids.length} grup</span>`; } catch {} }
+        if (!groupLabel) groupLabel = `<span class="text-xs text-gray-500">${escHtml(m.chat_id||'')}</span>`;
+        const contentLabel = m.media_type==='image' ? 'Resim' : m.media_type==='video' ? 'Video' : m.media_type==='audio' ? 'Ses' : escHtml((m.message||'').substring(0,90));
 
-        return `<div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors border-b border-gray-50 last:border-b-0">
-            <div class="flex-shrink-0 text-center w-16">
-              <div class="text-[11px] text-gray-400 leading-tight">${dateStr}</div>
-              <div class="text-[11px] font-medium text-red-500 leading-tight mt-0.5 capitalize">${dayStr}</div>
-              <div class="text-sm font-bold text-gray-800 leading-tight mt-0.5">${timeStr}</div>
+        return `<div class="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-100 mb-2 hover:bg-gray-50/60 transition-colors">
+          <div class="text-sm font-bold text-gray-800 w-10 flex-shrink-0 text-center">${timeStr}</div>
+          <div class="w-px h-7 bg-gray-100 flex-shrink-0"></div>
+          <div class="w-8 h-8 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center${mediaSrc&&m.media_type==='image'?' cursor-pointer schedule-media-icon':''}" style="color:${typeColor}"${mediaSrc&&m.media_type==='image'?` data-src="${mediaSrc}"`:''}><span class="material-symbols-rounded" style="font-size:18px">${typeIcon}</span></div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-gray-800 truncate">${contentLabel}</p>
+            <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              ${groupLabel}
+              ${repeatLabel?`<span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:11px">repeat</span>${repeatLabel}</span>`:''}
             </div>
-            <div class="w-px h-8 bg-gray-100 flex-shrink-0"></div>
-            <div class="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center${mediaSrc && m.media_type === 'image' ? ' cursor-pointer schedule-media-icon' : ''}" style="color:${typeColor}"${mediaSrc && m.media_type === 'image' ? ` data-src="${mediaSrc}"` : ''}>
-              <span class="material-symbols-rounded" style="font-size:20px">${typeIcon}</span>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-gray-800 truncate">${contentLabel}</p>
-              <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-                ${groupLabel}
-                ${repeatLabel ? `<span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><span class="material-symbols-rounded" style="font-size:12px">repeat</span>${repeatLabel}</span>` : ''}
-              </div>
-            </div>
-            <div class="flex items-center gap-0.5 flex-shrink-0">
-              <button onclick="openEditSchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors">
-                <span class="material-symbols-rounded" style="font-size:18px">edit</span>
-              </button>
-              <button onclick="deleteScheduled(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                <span class="material-symbols-rounded" style="font-size:18px">delete</span>
-              </button>
-            </div>
-          </div>`;
+          </div>
+          <div class="flex items-center gap-0.5 flex-shrink-0">
+            <button onclick="openEditSchedule(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors"><span class="material-symbols-rounded" style="font-size:16px">edit</span></button>
+            <button onclick="deleteScheduled(${m.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"><span class="material-symbols-rounded" style="font-size:16px">delete</span></button>
+          </div>
+        </div>`;
     }).join('');
 
-    // Attach hover preview events to image icons
-    const tooltip   = document.getElementById('mediaHoverTooltip');
+    panel.classList.remove('hidden');
+    panel.innerHTML = `
+      <div class="border-t border-gray-100 pt-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-sm font-semibold text-gray-700">${day} ${MONTHS[mo]} ${yr}</span>
+          <span class="text-xs text-red-500 font-medium capitalize">${dayStr}</span>
+          <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">${msgs.length} mesaj</span>
+          <button onclick="document.getElementById('dayMsgsPanel').classList.add('hidden')"
+            class="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+            <span class="material-symbols-rounded" style="font-size:16px">close</span>
+          </button>
+        </div>
+        ${msgRows}
+      </div>`;
+
+    // Hover preview for images in panel
+    const tooltip    = document.getElementById('mediaHoverTooltip');
     const tooltipImg = document.getElementById('mediaHoverImg');
-    document.querySelectorAll('.schedule-media-icon').forEach(el => {
-        el.addEventListener('mouseenter', (e) => {
-            const src = el.dataset.src;
-            if (!src) return;
-            tooltipImg.src = src;
-            tooltip.classList.remove('hidden');
-            positionTooltip(e);
-        });
+    panel.querySelectorAll('.schedule-media-icon').forEach(el => {
+        el.addEventListener('mouseenter', e => { tooltipImg.src=el.dataset.src; tooltip.classList.remove('hidden'); positionTooltip(e); });
         el.addEventListener('mousemove', positionTooltip);
-        el.addEventListener('mouseleave', () => {
-            tooltip.classList.add('hidden');
-            tooltipImg.src = '';
-        });
+        el.addEventListener('mouseleave', () => { tooltip.classList.add('hidden'); tooltipImg.src=''; });
     });
-}
+
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
 
 function positionTooltip(e) {
     const tooltip = document.getElementById('mediaHoverTooltip');
-    const margin = 14;
-    const tw = 220, th = 240;
-    let x = e.clientX + margin;
-    let y = e.clientY + margin;
+    const margin = 14, tw = 220, th = 240;
+    let x = e.clientX + margin, y = e.clientY + margin;
     if (x + tw > window.innerWidth)  x = e.clientX - tw - margin;
     if (y + th > window.innerHeight) y = e.clientY - th - margin;
     tooltip.style.left = x + 'px';
