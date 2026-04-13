@@ -840,13 +840,23 @@ document.getElementById('editMediaPickerModal')?.addEventListener('click', (e) =
 });
 document.getElementById('editMediaPickerFolder')?.addEventListener('change', loadEditMediaPickerArchive);
 
-document.getElementById('editScheduleFileInput')?.addEventListener('change', (e) => {
+// Picker içindeki "bilgisayardan yükle"
+document.getElementById('editScheduleFileInputPicker')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     _editScheduleNewFile = file;
     _editScheduleArchiveItem = null;
     applyEditMediaPreview(null, file);
     closeEditMediaPicker();
+});
+
+// Ana modal üzerindeki file input (doğrudan tetiklenirse)
+document.getElementById('editScheduleFileInput')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    _editScheduleNewFile = file;
+    _editScheduleArchiveItem = null;
+    applyEditMediaPreview(null, file);
 });
 
 document.getElementById('editScheduleSave')?.addEventListener('click', async () => {
