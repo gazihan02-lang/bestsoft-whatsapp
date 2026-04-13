@@ -531,8 +531,18 @@
           </div>
           <div class="px-5 py-4 flex flex-col gap-4">
             <input type="hidden" id="editScheduleId">
+            <!-- Medya önizleme -->
+            <div id="editScheduleMediaPreview" class="hidden rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+              <img id="editSchedulePreviewImg" class="hidden w-full max-h-52 object-contain bg-gray-100">
+              <video id="editSchedulePreviewVid" class="hidden w-full max-h-52 bg-black" controls></video>
+              <audio id="editSchedulePreviewAud" class="hidden w-full" controls></audio>
+              <div class="px-3 py-2 text-xs text-gray-500 flex items-center gap-1.5" id="editScheduleMediaLabel">
+                <span class="material-symbols-rounded" style="font-size:15px">attachment</span>
+                <span id="editScheduleMediaName"></span>
+              </div>
+            </div>
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">Mesaj</label>
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">Mesaj / Açıklama</label>
               <textarea id="editScheduleMessage" rows="4"
                 class="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-800 focus:outline-none focus:border-indigo-400 resize-none transition-colors"
                 placeholder="Mesaj (yalnızca metin mesajlar için)"></textarea>

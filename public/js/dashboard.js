@@ -632,6 +632,32 @@ window.openEditSchedule = (id) => {
     document.getElementById('editScheduleDate').value = d.toISOString().split('T')[0];
     document.getElementById('editScheduleTime').value = d.toTimeString().slice(0,5);
     document.getElementById('editScheduleRepeat').value = m.repeat_type || 'none';
+
+    // Medya önizleme
+    const previewWrap = document.getElementById('editScheduleMediaPreview');
+    const previewImg  = document.getElementById('editSchedulePreviewImg');
+    const previewVid  = document.getElementById('editSchedulePreviewVid');
+    const previewAud  = document.getElementById('editSchedulePreviewAud');
+    const mediaName   = document.getElementById('editScheduleMediaName');
+    [previewImg, previewVid, previewAud].forEach(el => el.classList.add('hidden'));
+    if (m.media_path) {
+        previewWrap.classList.remove('hidden');
+        const src = m.media_path.startsWith('/') ? m.media_path : '/' + m.media_path;
+        mediaName.textContent = src.split('/').pop();
+        if (m.media_type === 'image') {
+            previewImg.src = src;
+            previewImg.classList.remove('hidden');
+        } else if (m.media_type === 'video') {
+            previewVid.src = src;
+            previewVid.classList.remove('hidden');
+        } else if (m.media_type === 'audio') {
+            previewAud.src = src;
+            previewAud.classList.remove('hidden');
+        }
+    } else {
+        previewWrap.classList.add('hidden');
+    }
+
     const modal = document.getElementById('editScheduleModal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
