@@ -184,6 +184,25 @@ module.exports = function (io) {
         res.json({ success: true, data: newMsg });
     });
 
+    // ── Zamanlanmış mesajı güncelle ──────────────────────────────
+    router.patch('/scheduled/:id', (req, res) => {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
+        const { message, send_at, repeat_type } = req.body;
+        if (!send_at) return res.status(400).json({ error: 'Tarih/saat zorunlu.' });
+        const sendAtDate = new Date(send_at);
+        if (isNaN(sendAtDate.getTime())) return res.status(400).json({ error: 'Geçersiz tarih.' });
+        cancelScheduledById(id);
+        db.prepare('UPDATE scheduled_messages SET message = ?, send_at = ?, repeat_type = ? WHERE id = ?')
+            .run(message ?? '', sendAtDate.toISOString(), repeat_type || 'none', id);
+        const updated = db.prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(id);
+        if (updated) {
+            const delayMs = Math.max(sendAtDate.getTime() - Date.now(), 0);
+            addScheduledTimeout(client, updated, delayMs, io);
+        }
+        res.json({ success: true });
+    });
+
     // ── Zamanlanmış mesajı iptal et ───────────────────────────────
     router.delete('/scheduled/:id', (req, res) => {
         const id = parseInt(req.params.id);

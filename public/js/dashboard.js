@@ -565,6 +565,7 @@ function loadScheduled() {
 function renderScheduleTable(msgs) {
     const tbody = document.getElementById('scheduleTableBody');
     document.getElementById('statScheduled').textContent = msgs.length;
+    _editScheduleAll = msgs;
 
     if (!msgs.length) {
         tbody.innerHTML = `<tr><td colspan="4">
@@ -597,10 +598,16 @@ function renderScheduleTable(msgs) {
             <td class="td-truncate">${contentLabel}</td>
             <td style="white-space:nowrap">${sendAt}<div style="font-size:.75rem;color:#6b7280">${repeatLabel}</div></td>
             <td>
-                <button onclick="deleteScheduled(${m.id})" title="İptal Et"
-                    class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                    <span class="material-symbols-rounded" style="font-size:18px">delete</span>
-                </button>
+                <div class="flex items-center gap-1">
+                    <button onclick="openEditSchedule(${m.id})" title="Güncelle"
+                        class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-400 hover:bg-indigo-50 transition-colors">
+                        <span class="material-symbols-rounded" style="font-size:18px">edit</span>
+                    </button>
+                    <button onclick="deleteScheduled(${m.id})" title="İptal Et"
+                        class="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                        <span class="material-symbols-rounded" style="font-size:18px">delete</span>
+                    </button>
+                </div>
             </td>
         </tr>`;
     }).join('');
@@ -612,6 +619,58 @@ window.deleteScheduled = async (id) => {
     if (res.ok) { loadScheduled(); showSnack('Zamanlanmış mesaj iptal edildi.'); }
     else { showSnack('İptal edilemedi.', true); }
 };
+
+/* ── Zamanlanmış Mesaj Güncelle Modal ── */
+let _editScheduleAll = [];
+
+window.openEditSchedule = (id) => {
+    const m = _editScheduleAll.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('editScheduleId').value = id;
+    document.getElementById('editScheduleMessage').value = m.message || '';
+    const d = new Date(m.send_at);
+    document.getElementById('editScheduleDate').value = d.toISOString().split('T')[0];
+    document.getElementById('editScheduleTime').value = d.toTimeString().slice(0,5);
+    document.getElementById('editScheduleRepeat').value = m.repeat_type || 'none';
+    const modal = document.getElementById('editScheduleModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+function closeEditScheduleModal() {
+    const modal = document.getElementById('editScheduleModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+document.getElementById('editScheduleClose')?.addEventListener('click', closeEditScheduleModal);
+document.getElementById('editScheduleCancel')?.addEventListener('click', closeEditScheduleModal);
+document.getElementById('editScheduleModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('editScheduleModal')) closeEditScheduleModal();
+});
+
+document.getElementById('editScheduleSave')?.addEventListener('click', async () => {
+    const id = document.getElementById('editScheduleId').value;
+    const message = document.getElementById('editScheduleMessage').value;
+    const date = document.getElementById('editScheduleDate').value;
+    const time = document.getElementById('editScheduleTime').value;
+    const repeat_type = document.getElementById('editScheduleRepeat').value;
+    if (!date || !time) { showSnack('Tarih ve saat zorunlu.', true); return; }
+    const send_at = new Date(`${date}T${time}`).toISOString();
+    const res = await fetch(`/api/scheduled/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, send_at, repeat_type })
+    });
+    if (res.ok) {
+        closeEditScheduleModal();
+        loadScheduled();
+        showSnack('Zamanlanmış mesaj güncellendi.');
+    } else {
+        const d = await res.json().catch(() => ({}));
+        showSnack(d.error || 'Güncellenemedi.', true);
+    }
+});
 
 document.getElementById('refreshScheduleBtn').addEventListener('click', loadScheduled);
 
