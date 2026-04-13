@@ -642,7 +642,10 @@ window.openEditSchedule = (id) => {
     [previewImg, previewVid, previewAud].forEach(el => el.classList.add('hidden'));
     if (m.media_path) {
         previewWrap.classList.remove('hidden');
-        const src = m.media_path.startsWith('/') ? m.media_path : '/' + m.media_path;
+        // media_path DB'de mutlak sunucu yolu olarak tutulur (/opt/.../media/uploads/file.jpg)
+        // Tarayıcıya /media/uploads/file.jpg olarak sunulur
+        const mediaIdx = m.media_path.indexOf('/media/');
+        const src = mediaIdx !== -1 ? m.media_path.slice(mediaIdx) : '/' + m.media_path.split('/').pop();
         mediaName.textContent = src.split('/').pop();
         if (m.media_type === 'image') {
             previewImg.src = src;
