@@ -424,6 +424,32 @@ module.exports = function (io) {
         res.json({ success: true });
     });
 
+    // ── Grup Şablonları ───────────────────────────────────────────
+    router.get('/group-templates', (req, res) => {
+        const rows = db.prepare('SELECT * FROM group_templates ORDER BY name ASC').all();
+        res.json(rows.map(r => ({ ...r, group_ids: JSON.parse(r.group_ids) })));
+    });
+
+    router.post('/group-templates', (req, res) => {
+        const { name, group_ids } = req.body;
+        if (!name || !Array.isArray(group_ids) || !group_ids.length)
+            return res.status(400).json({ error: 'name ve group_ids zorunlu.' });
+        try {
+            const result = db.prepare('INSERT INTO group_templates (name, group_ids) VALUES (?, ?)')
+                .run(name.trim(), JSON.stringify(group_ids));
+            res.json({ success: true, id: result.lastInsertRowid });
+        } catch {
+            res.status(400).json({ error: 'Bu isimde şablon zaten mevcut.' });
+        }
+    });
+
+    router.delete('/group-templates/:id', (req, res) => {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
+        db.prepare('DELETE FROM group_templates WHERE id = ?').run(id);
+        res.json({ success: true });
+    });
+
     // ── Ayarlar ──────────────────────────────────────────────────
     router.get('/settings', (req, res) => {
         const rows = db.prepare('SELECT * FROM settings').all();

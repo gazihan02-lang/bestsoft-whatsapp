@@ -45,7 +45,7 @@ function navigate(section) {
     if (pageTitleEl) pageTitleEl.textContent = PAGE_TITLES[section] || section;
 
     // Load data on navigate
-    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadArchivePicker(); }
+    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadGroupTemplates(); loadArchivePicker(); }
     if (section === 'archives') loadArchive();
     if (section === 'logs')     loadLogs();
     if (section === 'settings') loadSettings();
@@ -296,6 +296,67 @@ document.getElementById('clearGroupSel').addEventListener('click', () => {
 document.getElementById('groupSearchInput').addEventListener('input', e => {
     const q = e.target.value.toLowerCase();
     renderGroupList(allGroups.filter(g => g.name.toLowerCase().includes(q)));
+});
+
+/* ======= Grup Şablonları ======= */
+let groupTemplates = [];
+
+function loadGroupTemplates() {
+    fetch('/api/group-templates')
+        .then(r => r.json())
+        .then(data => { groupTemplates = data; renderGroupTemplateChips(); })
+        .catch(() => {});
+}
+
+function renderGroupTemplateChips() {
+    const container = document.getElementById('groupTemplateChips');
+    if (!container) return;
+    if (!groupTemplates.length) {
+        container.innerHTML = '<span class="text-xs text-gray-300 italic">henüz yok</span>';
+        return;
+    }
+    container.innerHTML = groupTemplates.map(t => `
+        <span class="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 group">
+            <button class="tpl-apply hover:text-indigo-900 truncate max-w-[80px]" data-id="${t.id}" title="Uygula: ${escHtml(t.name)}">${escHtml(t.name)}</button>
+            <button class="tpl-del ml-0.5 text-indigo-400 hover:text-red-500 transition-colors" data-id="${t.id}" title="Sil">
+                <span class="material-symbols-rounded" style="font-size:12px">close</span>
+            </button>
+        </span>`).join('');
+
+    container.querySelectorAll('.tpl-apply').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tpl = groupTemplates.find(t => t.id === parseInt(btn.dataset.id));
+            if (!tpl) return;
+            selectedGroupIds.clear();
+            tpl.group_ids.forEach(id => selectedGroupIds.add(id));
+            renderGroupList(allGroups);
+            document.getElementById('selGroupCount').textContent = selectedGroupIds.size;
+            showSnack(`"${tpl.name}" şablonu uygulandı.`);
+        });
+    });
+    container.querySelectorAll('.tpl-del').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Bu şablonu silmek istiyor musunuz?')) return;
+            await fetch(`/api/group-templates/${btn.dataset.id}`, { method: 'DELETE' });
+            loadGroupTemplates();
+            showSnack('Şablon silindi.');
+        });
+    });
+}
+
+document.getElementById('saveGroupTemplateBtn')?.addEventListener('click', async () => {
+    if (!selectedGroupIds.size) { showSnack('Önce en az bir grup seçin.', true); return; }
+    const name = prompt('Şablon adı:');
+    if (!name || !name.trim()) return;
+    const res = await fetch('/api/group-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), group_ids: [...selectedGroupIds] })
+    });
+    const data = await res.json();
+    if (!res.ok) { showSnack(data.error || 'Kaydedilemedi.', true); return; }
+    loadGroupTemplates();
+    showSnack(`"${name.trim()}" şablonu kaydedildi.`);
 });
 
 /* ======= İçerik Sekmeleri ======= */

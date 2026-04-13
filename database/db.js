@@ -81,6 +81,15 @@ db.exec(`
 
 try { db.exec("UPDATE image_archive SET media_type = 'image' WHERE media_type IS NULL OR media_type = ''"); } catch {}
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS group_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    group_ids TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Varsayılan admin kullanıcısı (yoksa oluştur)
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {
