@@ -625,6 +625,7 @@ let _editScheduleAll = [];
 
 window.openEditSchedule = (id) => {
     _editScheduleNewFile = null;
+    _editScheduleArchiveItem = null;
     const fileInput = document.getElementById('editScheduleFileInput');
     if (fileInput) fileInput.value = '';
     const m = _editScheduleAll.find(x => x.id === id);
@@ -681,29 +682,110 @@ document.getElementById('editScheduleModal')?.addEventListener('click', (e) => {
     if (e.target === document.getElementById('editScheduleModal')) closeEditScheduleModal();
 });
 
-// Medya değiştir butonu
+// Medya değiştir — arşiv seçici modal
 let _editScheduleNewFile = null;
-document.getElementById('editScheduleReplaceBtn')?.addEventListener('click', () => {
-    document.getElementById('editScheduleFileInput').click();
+let _editScheduleArchiveItem = null; // { path, media_type, name }
+
+function openEditMediaPicker() {
+    _editMediaPickerSelected = null;
+    document.getElementById('editMediaPickerModal').classList.remove('hidden');
+    document.getElementById('editMediaPickerModal').classList.add('flex');
+    loadEditMediaPickerArchive();
+}
+function closeEditMediaPicker() {
+    document.getElementById('editMediaPickerModal').classList.add('hidden');
+    document.getElementById('editMediaPickerModal').classList.remove('flex');
+}
+
+function loadEditMediaPickerArchive() {
+    const folder = document.getElementById('editMediaPickerFolder')?.value || '__all__';
+    const folderParam = folder !== '__all__' ? `&folder=${encodeURIComponent(folder)}` : '';
+    fetch(`/api/archive?${folderParam}`)
+        .then(r => r.json())
+        .then(items => renderEditMediaPickerGrid(Array.isArray(items) ? items : []))
+        .catch(() => renderEditMediaPickerGrid([]));
+
+    fetch('/api/archive/folders')
+        .then(r => r.json())
+        .then(rows => {
+            const sel = document.getElementById('editMediaPickerFolder');
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="__all__">Tüm Klasörler</option>' +
+                (Array.isArray(rows) ? rows : []).map(r => {
+                    const f = r.folder || '';
+                    return `<option value="${escHtml(f)}">${escHtml(f)}</option>`;
+                }).join('');
+            sel.value = cur;
+        }).catch(() => {});
+}
+
+function renderEditMediaPickerGrid(items) {
+    const grid = document.getElementById('editMediaPickerGrid');
+    if (!items.length) {
+        grid.innerHTML = '<div class="col-span-full py-8 text-center text-gray-400 text-sm">Arşiv boş</div>';
+        return;
+    }
+    grid.innerHTML = items.map(item => {
+        const icon = item.media_type === 'video' ? 'movie' : item.media_type === 'audio' ? 'mic' : null;
+        const thumb = icon
+            ? `<div class="w-full h-full flex items-center justify-center bg-gray-100"><span class="material-symbols-rounded text-gray-400" style="font-size:32px">${icon}</span></div>`
+            : `<img src="${escHtml(item.path)}" class="w-full h-full object-cover">`;
+        return `<div class="edit-media-pick-item relative rounded-xl overflow-hidden border-2 border-transparent hover:border-indigo-400 cursor-pointer transition-all"
+                     style="aspect-ratio:1" data-id="${item.id}" data-path="${escHtml(item.path)}" data-type="${escHtml(item.media_type||'image')}" data-name="${escHtml(item.name||'')}">
+            ${thumb}
+            <div class="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-1 text-white text-[10px] truncate">${escHtml(item.name||'')}</div>
+        </div>`;
+    }).join('');
+    grid.querySelectorAll('.edit-media-pick-item').forEach(el => {
+        el.addEventListener('click', () => {
+            grid.querySelectorAll('.edit-media-pick-item').forEach(x => x.classList.remove('border-indigo-500'));
+            el.classList.add('border-indigo-500');
+            _editScheduleNewFile = null;
+            _editScheduleArchiveItem = { path: el.dataset.path, media_type: el.dataset.type, name: el.dataset.name };
+            applyEditMediaPreview({ path: el.dataset.path, media_type: el.dataset.type, name: el.dataset.name }, null);
+            closeEditMediaPicker();
+        });
+    });
+}
+
+function applyEditMediaPreview(archiveItem, file) {
+    const previewWrap = document.getElementById('editScheduleMediaPreview');
+    const previewImg  = document.getElementById('editSchedulePreviewImg');
+    const previewVid  = document.getElementById('editSchedulePreviewVid');
+    const previewAud  = document.getElementById('editSchedulePreviewAud');
+    const mediaName   = document.getElementById('editScheduleMediaName');
+    [previewImg, previewVid, previewAud].forEach(el => { el.classList.add('hidden'); el.src = ''; });
+    previewWrap.classList.remove('hidden');
+    if (file) {
+        mediaName.textContent = file.name;
+        const url = URL.createObjectURL(file);
+        if (file.type.startsWith('image')) { previewImg.src = url; previewImg.classList.remove('hidden'); }
+        else if (file.type.startsWith('video')) { previewVid.src = url; previewVid.classList.remove('hidden'); }
+        else if (file.type.startsWith('audio')) { previewAud.src = url; previewAud.classList.remove('hidden'); }
+    } else if (archiveItem) {
+        mediaName.textContent = archiveItem.name || archiveItem.path.split('/').pop();
+        const t = archiveItem.media_type || 'image';
+        if (t === 'image') { previewImg.src = archiveItem.path; previewImg.classList.remove('hidden'); }
+        else if (t === 'video') { previewVid.src = archiveItem.path; previewVid.classList.remove('hidden'); }
+        else if (t === 'audio') { previewAud.src = archiveItem.path; previewAud.classList.remove('hidden'); }
+    }
+}
+
+document.getElementById('editScheduleReplaceBtn')?.addEventListener('click', openEditMediaPicker);
+document.getElementById('editMediaPickerClose')?.addEventListener('click', closeEditMediaPicker);
+document.getElementById('editMediaPickerModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('editMediaPickerModal')) closeEditMediaPicker();
 });
+document.getElementById('editMediaPickerFolder')?.addEventListener('change', loadEditMediaPickerArchive);
+
 document.getElementById('editScheduleFileInput')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     _editScheduleNewFile = file;
-    const previewImg = document.getElementById('editSchedulePreviewImg');
-    const previewVid = document.getElementById('editSchedulePreviewVid');
-    const previewAud = document.getElementById('editSchedulePreviewAud');
-    [previewImg, previewVid, previewAud].forEach(el => { el.classList.add('hidden'); if (el.src) el.src = ''; });
-    document.getElementById('editScheduleMediaName').textContent = file.name;
-    document.getElementById('editScheduleMediaPreview').classList.remove('hidden');
-    const url = URL.createObjectURL(file);
-    if (file.type.startsWith('image')) {
-        previewImg.src = url; previewImg.classList.remove('hidden');
-    } else if (file.type.startsWith('video')) {
-        previewVid.src = url; previewVid.classList.remove('hidden');
-    } else if (file.type.startsWith('audio')) {
-        previewAud.src = url; previewAud.classList.remove('hidden');
-    }
+    _editScheduleArchiveItem = null;
+    applyEditMediaPreview(null, file);
+    closeEditMediaPicker();
 });
 
 document.getElementById('editScheduleSave')?.addEventListener('click', async () => {
@@ -722,6 +804,14 @@ document.getElementById('editScheduleSave')?.addEventListener('click', async () 
         fd.append('send_at', send_at);
         fd.append('repeat_type', repeat_type);
         res = await fetch(`/api/scheduled/${id}`, { method: 'PATCH', body: fd });
+    } else if (_editScheduleArchiveItem) {
+        res = await fetch(`/api/scheduled/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, send_at, repeat_type,
+                archive_path: _editScheduleArchiveItem.path,
+                archive_type: _editScheduleArchiveItem.media_type })
+        });
     } else {
         res = await fetch(`/api/scheduled/${id}`, {
             method: 'PATCH',
