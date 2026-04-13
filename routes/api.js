@@ -97,6 +97,42 @@ module.exports = function (io) {
         res.json(botClient.getBotStatus());
     });
 
+    // ── GEÇICI: Son gönderilen botun mesajlarını gruplardan sil ───
+    router.post('/admin/delete-recent-bot-messages', async (req, res) => {
+        const client = botClient.getClient();
+        if (!client) return res.status(503).json({ error: 'Bot bağlı değil.' });
+        const minutesBack = parseInt(req.body.minutes || '120');
+        const cutoffMs = Date.now() - minutesBack * 60 * 1000;
+        let deleted = 0, errors = 0;
+        try {
+            const chats = await client.getChats();
+            const groups = chats.filter(c => c.isGroup);
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Transfer-Encoding': 'chunked' });
+            res.write(`${groups.length} grup taranıyor...\n`);
+            for (const chat of groups) {
+                const messages = await chat.fetchMessages({ limit: 30 });
+                for (const msg of messages) {
+                    if (msg.fromMe && msg.timestamp * 1000 >= cutoffMs) {
+                        try {
+                            await msg.delete(true);
+                            deleted++;
+                            res.write(`✓ Silindi [${chat.name}]: ${(msg.body||'[medya]').substring(0,60)}\n`);
+                            await new Promise(r => setTimeout(r, 600));
+                        } catch (e) {
+                            errors++;
+                            res.write(`✗ Hata [${chat.name}]: ${e.message}\n`);
+                        }
+                    }
+                }
+            }
+            res.write(`\nTamamlandı: ${deleted} silindi, ${errors} hata.\n`);
+            res.end();
+        } catch (e) {
+            res.write(`Kritik hata: ${e.message}\n`);
+            res.end();
+        }
+    });
+
     // ── Grup sayısı (önbellekten) ─────────────────────────────────
     router.get('/bot/groups', (req, res) => {
         const count = botClient.getGroupCount();
