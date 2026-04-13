@@ -72,12 +72,23 @@ function addScheduledTimeout(client, msgObj, delayMs, io = null) {
                 }
                 if (!targets.length) targets = [msgObj.chat_id];
 
-                for (const chatId of targets) {
+                for (let i = 0; i < targets.length; i++) {
+                    const chatId = targets[i];
+
+                    // Spam koruması: gruplar arası 8–18 saniye rastgele bekleme (ilk grupta bekleme yok)
+                    if (i > 0) {
+                        const waitMs = 8000 + Math.floor(Math.random() * 10000);
+                        await new Promise(r => setTimeout(r, waitMs));
+                    }
+
                     if (msgObj.media_path) {
                         const media = MessageMedia.fromFilePath(msgObj.media_path);
                         if (msgObj.media_type === 'audio') {
                             await client.sendMessage(chatId, media, { sendAudioAsVoice: true });
-                            if (msgObj.message) await client.sendMessage(chatId, msgObj.message);
+                            if (msgObj.message) {
+                                await new Promise(r => setTimeout(r, 1500 + Math.floor(Math.random() * 1500)));
+                                await client.sendMessage(chatId, msgObj.message);
+                            }
                         } else {
                             await client.sendMessage(chatId, media, { caption: msgObj.message || '' });
                         }
