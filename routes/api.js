@@ -229,49 +229,6 @@ module.exports = function (io) {
         res.json({ success: true });
     });
 
-    // ── Zamanlanmış mesajı diğer tarihlere kopyala ────────────────
-    router.post('/scheduled/:id/copy', (req, res) => {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
-
-        const { dates } = req.body;
-        if (!Array.isArray(dates) || !dates.length) return res.status(400).json({ error: 'Tarih listesi gerekli.' });
-
-        for (const d of dates) {
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d))) {
-                return res.status(400).json({ error: `Geçersiz tarih formatı: ${d}` });
-            }
-        }
-
-        const orig = db.prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(id);
-        if (!orig) return res.status(404).json({ error: 'Mesaj bulunamadı.' });
-
-        // Orijinal mesajın saat kısmını al, yeni tarihe uygula
-        const origDate = new Date(orig.send_at);
-        const timeStr = origDate.toISOString().split('T')[1]; // "HH:MM:SS.mmmZ"
-
-        const botClient = require('../bot/client');
-        const clientInst = botClient.getClient();
-        let created = 0;
-
-        for (const dateStr of dates) {
-            const newSendAt = new Date(`${dateStr}T${timeStr}`);
-            if (isNaN(newSendAt.getTime())) continue;
-            if (newSendAt.getTime() <= Date.now()) continue;
-
-            const result = db.prepare(
-                'INSERT INTO scheduled_messages (chat_id, chat_ids, message, send_at, media_path, media_type, overlay_text, repeat_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-            ).run(orig.chat_id, orig.chat_ids, orig.message, newSendAt.toISOString(), orig.media_path, orig.media_type, orig.overlay_text, orig.repeat_type);
-
-            const newMsg = db.prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(result.lastInsertRowid);
-            const delayMs = newSendAt.getTime() - Date.now();
-            addScheduledTimeout(clientInst, newMsg, delayMs, io);
-            created++;
-        }
-
-        res.json({ success: true, created });
-    });
-
     // ── Arşiv öğelerini listele ───────────────────────────────────
     router.get('/archive', (req, res) => {
         const type = String(req.query.type || '').trim();
