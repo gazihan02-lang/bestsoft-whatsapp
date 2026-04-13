@@ -105,24 +105,37 @@ module.exports = function (io) {
         const cutoffMs = Date.now() - minutesBack * 60 * 1000;
         let deleted = 0, errors = 0;
         try {
-            const chats = await client.getChats();
-            const groups = chats.filter(c => c.isGroup);
+            // Tüm sent=1 mesajlardan chat ID'leri topla
+            const rows = db.prepare("SELECT chat_ids FROM scheduled_messages WHERE sent = 1").all();
+            const allIds = new Set();
+            rows.forEach(r => {
+                try { JSON.parse(r.chat_ids || '[]').forEach(id => allIds.add(id)); } catch {}
+            });
+
             res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Transfer-Encoding': 'chunked' });
-            res.write(`${groups.length} grup taranıyor...\n`);
-            for (const chat of groups) {
-                const messages = await chat.fetchMessages({ limit: 30 });
-                for (const msg of messages) {
-                    if (msg.fromMe && msg.timestamp * 1000 >= cutoffMs) {
-                        try {
-                            await msg.delete(true);
-                            deleted++;
-                            res.write(`✓ Silindi [${chat.name}]: ${(msg.body||'[medya]').substring(0,60)}\n`);
-                            await new Promise(r => setTimeout(r, 600));
-                        } catch (e) {
-                            errors++;
-                            res.write(`✗ Hata [${chat.name}]: ${e.message}\n`);
+            res.write(`${allIds.size} grup taranıyor...\n`);
+
+            for (const chatId of allIds) {
+                try {
+                    const chat = await client.getChatById(chatId);
+                    if (!chat) continue;
+                    const messages = await chat.fetchMessages({ limit: 30 });
+                    for (const msg of messages) {
+                        if (msg.fromMe && msg.timestamp * 1000 >= cutoffMs) {
+                            try {
+                                await msg.delete(true);
+                                deleted++;
+                                res.write(`✓ Silindi [${chat.name}]: ${(msg.body||'[medya]').substring(0,60)}\n`);
+                                await new Promise(r => setTimeout(r, 700));
+                            } catch (e) {
+                                errors++;
+                                res.write(`✗ Hata [${chat.name}]: ${e.message}\n`);
+                            }
                         }
                     }
+                } catch (e) {
+                    errors++;
+                    res.write(`✗ Chat yüklenemedi [${chatId}]: ${e.message}\n`);
                 }
             }
             res.write(`\nTamamlandı: ${deleted} silindi, ${errors} hata.\n`);
