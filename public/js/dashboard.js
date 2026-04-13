@@ -402,20 +402,42 @@ function renderMsgDraftChips() {
     });
 }
 
-document.getElementById('saveMsgDraftBtn')?.addEventListener('click', async () => {
+document.getElementById('saveMsgDraftBtn')?.addEventListener('click', () => {
     const content = document.getElementById('schTextMessage').value.trim();
     if (!content) { showSnack('Önce mesaj yazın.', true); return; }
-    const name = prompt('Taslak adı:');
-    if (!name || !name.trim()) return;
+    document.getElementById('draftSaveRow').classList.remove('hidden');
+    document.getElementById('saveMsgDraftBtn').classList.add('hidden');
+    const nameInput = document.getElementById('draftNameInput');
+    nameInput.value = '';
+    nameInput.focus();
+});
+
+document.getElementById('draftSaveCancelBtn')?.addEventListener('click', () => {
+    document.getElementById('draftSaveRow').classList.add('hidden');
+    document.getElementById('saveMsgDraftBtn').classList.remove('hidden');
+});
+
+document.getElementById('draftNameInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('draftSaveConfirmBtn')?.click();
+    if (e.key === 'Escape') document.getElementById('draftSaveCancelBtn')?.click();
+});
+
+document.getElementById('draftSaveConfirmBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('draftNameInput').value.trim();
+    if (!name) { showSnack('Taslak adı girin.', true); return; }
+    const content = document.getElementById('schTextMessage').value.trim();
+    if (!content) { showSnack('Mesaj boş.', true); return; }
     const res = await fetch('/api/message-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), content })
+        body: JSON.stringify({ name, content })
     });
     const data = await res.json();
     if (!res.ok) { showSnack(data.error || 'Kaydedilemedi.', true); return; }
+    document.getElementById('draftSaveRow').classList.add('hidden');
+    document.getElementById('saveMsgDraftBtn').classList.remove('hidden');
     loadMessageDrafts();
-    showSnack(`"${name.trim()}" taslağı kaydedildi.`);
+    showSnack(`"${name}" taslağı kaydedildi.`);
 });
 
 /* ======= İçerik Sekmeleri ======= */

@@ -384,12 +384,25 @@
               <div class="tab-pane active p-4" id="tabText">
                 <textarea id="schTextMessage" rows="5" placeholder="Mesajınızı yazın…"
                   class="w-full border border-gray-200 rounded-xl p-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 resize-none transition-colors bg-gray-50 focus:bg-white"></textarea>
-                <!-- Drafts row -->
-                <div class="flex items-center gap-2 mt-2.5 flex-wrap">
-                  <div id="msgDraftChips" class="flex flex-wrap gap-1.5 flex-1 min-w-0"></div>
+                <!-- Drafts area -->
+                <div class="mt-2.5 border border-gray-100 rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="material-symbols-rounded text-violet-400" style="font-size:14px">bookmark</span>
+                    <span class="text-xs font-semibold text-gray-500">Taslaklar</span>
+                  </div>
+                  <div id="msgDraftChips" class="flex flex-wrap gap-1.5 mb-2"></div>
+                  <!-- Inline save row -->
+                  <div id="draftSaveRow" class="hidden flex items-center gap-2">
+                    <input id="draftNameInput" type="text" placeholder="Taslak adı…"
+                      class="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-violet-400 bg-white min-w-0">
+                    <button id="draftSaveConfirmBtn"
+                      class="flex-shrink-0 px-2.5 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors">Kaydet</button>
+                    <button id="draftSaveCancelBtn"
+                      class="flex-shrink-0 px-2 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-200 rounded-lg transition-colors">İptal</button>
+                  </div>
                   <button id="saveMsgDraftBtn"
-                    class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg border border-violet-100 transition-colors">
-                    <span class="material-symbols-rounded" style="font-size:14px">add_notes</span>Taslak Kaydet
+                    class="flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors">
+                    <span class="material-symbols-rounded" style="font-size:14px">add</span>Bu mesajı taslak olarak kaydet
                   </button>
                 </div>
               </div>
@@ -894,7 +907,7 @@
     });
   </script>
 
-  <script src="/js/dashboard.js?v=20260413-drafts"></script>
+  <script src="/js/dashboard.js?v=20260413-drafts2"></script>
 <script src="/js/fm.js"></script>
 </body>
 </html>
