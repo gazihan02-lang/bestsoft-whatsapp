@@ -424,6 +424,31 @@ module.exports = function (io) {
         res.json({ success: true });
     });
 
+    // ── Mesaj Taslakları ────────────────────────────────────────
+    router.get('/message-drafts', (req, res) => {
+        const rows = db.prepare('SELECT * FROM message_drafts ORDER BY name ASC').all();
+        res.json(rows);
+    });
+
+    router.post('/message-drafts', (req, res) => {
+        const { name, content } = req.body;
+        if (!name || !content) return res.status(400).json({ error: 'name ve content zorunlu.' });
+        try {
+            const result = db.prepare('INSERT INTO message_drafts (name, content) VALUES (?, ?)')
+                .run(name.trim(), content.trim());
+            res.json({ success: true, id: result.lastInsertRowid });
+        } catch {
+            res.status(400).json({ error: 'Bu isimde taslak zaten mevcut.' });
+        }
+    });
+
+    router.delete('/message-drafts/:id', (req, res) => {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Geçersiz ID.' });
+        db.prepare('DELETE FROM message_drafts WHERE id = ?').run(id);
+        res.json({ success: true });
+    });
+
     // ── Grup Şablonları ───────────────────────────────────────────
     router.get('/group-templates', (req, res) => {
         const rows = db.prepare('SELECT * FROM group_templates ORDER BY name ASC').all();

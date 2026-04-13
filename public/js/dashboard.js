@@ -45,7 +45,7 @@ function navigate(section) {
     if (pageTitleEl) pageTitleEl.textContent = PAGE_TITLES[section] || section;
 
     // Load data on navigate
-    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadGroupTemplates(); loadArchivePicker(); }
+    if (section === 'schedule') { loadScheduled(); loadGroupList(); loadGroupTemplates(); loadMessageDrafts(); loadArchivePicker(); }
     if (section === 'archives') loadArchive();
     if (section === 'logs')     loadLogs();
     if (section === 'settings') loadSettings();
@@ -357,6 +357,65 @@ document.getElementById('saveGroupTemplateBtn')?.addEventListener('click', async
     if (!res.ok) { showSnack(data.error || 'Kaydedilemedi.', true); return; }
     loadGroupTemplates();
     showSnack(`"${name.trim()}" şablonu kaydedildi.`);
+});
+
+/* ======= Mesaj Taslakları ======= */
+let messageDrafts = [];
+
+function loadMessageDrafts() {
+    fetch('/api/message-drafts')
+        .then(r => r.json())
+        .then(data => { messageDrafts = data; renderMsgDraftChips(); })
+        .catch(() => {});
+}
+
+function renderMsgDraftChips() {
+    const container = document.getElementById('msgDraftChips');
+    if (!container) return;
+    if (!messageDrafts.length) {
+        container.innerHTML = '<span class="text-xs text-gray-300 italic">kayıtlı taslak yok</span>';
+        return;
+    }
+    container.innerHTML = messageDrafts.map(d => `
+        <span class="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+            <button class="draft-apply truncate max-w-[120px] hover:text-violet-900" data-id="${d.id}" title="${escHtml(d.content)}">${escHtml(d.name)}</button>
+            <button class="draft-del ml-0.5 text-violet-400 hover:text-red-500 transition-colors" data-id="${d.id}" title="Sil">
+                <span class="material-symbols-rounded" style="font-size:12px">close</span>
+            </button>
+        </span>`).join('');
+
+    container.querySelectorAll('.draft-apply').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const d = messageDrafts.find(x => x.id === parseInt(btn.dataset.id));
+            if (!d) return;
+            document.getElementById('schTextMessage').value = d.content;
+            showSnack(`"${d.name}" taslağı yapıştırıldı.`);
+        });
+    });
+    container.querySelectorAll('.draft-del').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Bu taslağı silmek istiyor musunuz?')) return;
+            await fetch(`/api/message-drafts/${btn.dataset.id}`, { method: 'DELETE' });
+            loadMessageDrafts();
+            showSnack('Taslak silindi.');
+        });
+    });
+}
+
+document.getElementById('saveMsgDraftBtn')?.addEventListener('click', async () => {
+    const content = document.getElementById('schTextMessage').value.trim();
+    if (!content) { showSnack('Önce mesaj yazın.', true); return; }
+    const name = prompt('Taslak adı:');
+    if (!name || !name.trim()) return;
+    const res = await fetch('/api/message-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), content })
+    });
+    const data = await res.json();
+    if (!res.ok) { showSnack(data.error || 'Kaydedilemedi.', true); return; }
+    loadMessageDrafts();
+    showSnack(`"${name.trim()}" taslağı kaydedildi.`);
 });
 
 /* ======= İçerik Sekmeleri ======= */

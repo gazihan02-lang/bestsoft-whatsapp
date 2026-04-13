@@ -90,6 +90,15 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Varsayılan admin kullanıcısı (yoksa oluştur)
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {

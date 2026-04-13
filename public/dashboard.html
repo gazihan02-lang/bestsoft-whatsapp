@@ -384,6 +384,14 @@
               <div class="tab-pane active p-4" id="tabText">
                 <textarea id="schTextMessage" rows="5" placeholder="Mesajınızı yazın…"
                   class="w-full border border-gray-200 rounded-xl p-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 resize-none transition-colors bg-gray-50 focus:bg-white"></textarea>
+                <!-- Drafts row -->
+                <div class="flex items-center gap-2 mt-2.5 flex-wrap">
+                  <div id="msgDraftChips" class="flex flex-wrap gap-1.5 flex-1 min-w-0"></div>
+                  <button id="saveMsgDraftBtn"
+                    class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg border border-violet-100 transition-colors">
+                    <span class="material-symbols-rounded" style="font-size:14px">add_notes</span>Taslak Kaydet
+                  </button>
+                </div>
               </div>
 
               <!-- Tab: Media -->
@@ -886,7 +894,7 @@
     });
   </script>
 
-  <script src="/js/dashboard.js?v=20260413-redesign"></script>
+  <script src="/js/dashboard.js?v=20260413-drafts"></script>
 <script src="/js/fm.js"></script>
 </body>
 </html>
